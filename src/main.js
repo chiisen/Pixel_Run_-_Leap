@@ -45,6 +45,10 @@ class TitleScene extends Phaser.Scene {
     const startButton = document.querySelector('#start-game');
     startButton.hidden = false;
 
+    const audioState = TitleScene.getAudioState();
+    this.musicEnabled = audioState.musicEnabled;
+    this.sfxEnabled = audioState.sfxEnabled;
+
     this.cameras.main.setBackgroundColor('#101a3a');
     this.add
       .text(GAME_WIDTH / 2, 150, 'Pixel Run & Leap', {
@@ -53,6 +57,32 @@ class TitleScene extends Phaser.Scene {
         fontSize: '42px',
       })
       .setOrigin(0.5);
+
+    this.musicToggle = this.add
+      .text(GAME_WIDTH / 2 - 80, 360, '音樂: 開', {
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        backgroundColor: '#3a4a8c',
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.sfxToggle = this.add
+      .text(GAME_WIDTH / 2 + 80, 360, '音效: 開', {
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        backgroundColor: '#3a4a8c',
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.musicToggle.on('pointerdown', () => this.toggleAudio('music'));
+    this.sfxToggle.on('pointerdown', () => this.toggleAudio('sfx'));
+    this.refreshAudioToggleLabels();
 
     this.add
       .text(GAME_WIDTH / 2, 260, '開始遊戲', {
@@ -79,6 +109,28 @@ class TitleScene extends Phaser.Scene {
     document.querySelector('#start-game').hidden = true;
     this.scene.start('GameScene');
   }
+
+  toggleAudio(kind) {
+    const state = TitleScene.getAudioState();
+    if (kind === 'music') {
+      state.musicEnabled = !state.musicEnabled;
+      this.musicEnabled = state.musicEnabled;
+    } else {
+      state.sfxEnabled = !state.sfxEnabled;
+      this.sfxEnabled = state.sfxEnabled;
+    }
+    this.refreshAudioToggleLabels();
+  }
+
+  refreshAudioToggleLabels() {
+    this.musicToggle?.setText(`音樂: ${this.musicEnabled ? '開' : '關'}`);
+    this.sfxToggle?.setText(`音效: ${this.sfxEnabled ? '開' : '關'}`);
+  }
+
+  static getAudioState() {
+    window.__pixelRunLeapAudio ??= { musicEnabled: true, sfxEnabled: true };
+    return window.__pixelRunLeapAudio;
+  }
 }
 
 class GameScene extends Phaser.Scene {
@@ -95,6 +147,12 @@ class GameScene extends Phaser.Scene {
     this.resultShown = false;
     this.audioStarted = false;
     this.physics.world.isPaused = false;
+    const audioState = (window.__pixelRunLeapAudio ??= {
+      musicEnabled: true,
+      sfxEnabled: true,
+    });
+    this.musicEnabled = audioState.musicEnabled;
+    this.sfxEnabled = audioState.sfxEnabled;
 
     const query = new URLSearchParams(window.location.search);
     this.debugMode = query.has('debug');
@@ -758,13 +816,17 @@ class GameScene extends Phaser.Scene {
     }
 
     this.sound.context.resume();
+    if (!this.musicEnabled) {
+      this.audioStarted = true;
+      return;
+    }
     this.music = this.sound.add('overworld', { loop: true, volume: 0.35 });
     this.music.play();
     this.audioStarted = true;
   }
 
   playSfx(key) {
-    if (this.audioStarted) {
+    if (this.audioStarted && this.sfxEnabled) {
       this.sound.playAudioSprite('sfx', key);
     }
   }

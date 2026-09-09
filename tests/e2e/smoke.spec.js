@@ -99,6 +99,16 @@ test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
   expect(state).toMatchObject({ lives: 0, status: 'game-over' });
 });
 
+test('可以從標題畫面關閉背景音樂', async ({ page }) => {
+  await page.goto('/?test=1');
+  await expect(page.locator('#start-game')).toBeVisible();
+  await page.evaluate(() => {
+    window.__pixelRunLeapAudio.musicEnabled = false;
+  });
+  const audioState = await page.evaluate(() => window.__pixelRunLeapAudio);
+  expect(audioState.musicEnabled).toBe(false);
+});
+
 test('Game Over 按 R 後重設狀態並恢復移動', async ({ page }) => {
   await page.goto('/?test=1');
   await page.locator('#start-game').click();
