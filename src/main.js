@@ -23,6 +23,8 @@ class PreloadScene extends Phaser.Scene {
     // 參考專案的 atlas 同時包含玩家、金幣、磚塊與敵人等像素素材。
     this.load.atlas('mario', '/assets/mario-sprites.png', '/assets/mario-sprites.json');
     this.load.image('clouds', '/assets/images/clouds.png');
+    this.load.image('tiles', '/assets/images/super-mario.png');
+    this.load.tilemapTiledJSON('level', '/assets/maps/super-mario.json');
     this.load.audio('overworld', '/assets/music/overworld.mp3');
     this.load.audioSprite('sfx', '/assets/audio/sfx.json', ['/assets/audio/sfx.mp3']);
   }
@@ -41,7 +43,7 @@ class GameScene extends Phaser.Scene {
   create() {
     // 目前先以單一場景驗證素材、物理與遊戲狀態可以正常串接。
     this.createBackground();
-    this.createPlatforms();
+    this.createLevel();
     this.createPlayer();
     this.createCoin();
     this.createEnemies();
@@ -49,11 +51,13 @@ class GameScene extends Phaser.Scene {
     this.createHud();
     this.createInput();
 
-    this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.collider(this.enemies, this.platforms);
+    this.physics.add.collider(this.player, this.worldLayer);
+    this.physics.add.collider(this.enemies, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
     this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.roundPixels = true;
 
     this.time.addEvent({
       delay: 1000,
@@ -99,40 +103,58 @@ class GameScene extends Phaser.Scene {
 
   createBackground() {
     this.cameras.main.setBackgroundColor('#5c94fc');
-    this.add.image(400, 105, 'clouds').setScale(3).setAlpha(0.9);
+    this.add
+      .tileSprite(0, 0, 4000, GAME_HEIGHT, 'clouds')
+      .setOrigin(0)
+      .setScale(2)
+      .setAlpha(0.9)
+      .setDepth(-1);
   }
 
-  createPlatforms() {
-    this.platforms = this.physics.add.staticGroup();
-    // 先用參考專案的磚塊組成測試平台，正式關卡會改由地圖資料建立。
-    this.platforms.create(400, 430, 'mario', 'brick').setScale(8, 4).refreshBody();
-    this.platforms.create(630, 335, 'mario', 'brick').setScale(3, 2).refreshBody();
+  createLevel() {
+    this.levelMap = this.make.tilemap({ key: 'level' });
+    const tileset = this.levelMap.addTilesetImage('SuperMarioBros-World1-1', 'tiles');
+
+    // Tiled 的 collide 屬性直接轉成 Phaser 的世界碰撞層。
+    this.worldLayer = this.levelMap
+      .createLayer('world', tileset, 0, 0)
+      .setCollisionByProperty({ collide: true });
+    this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
   }
 
   createPlayer() {
-    this.player = this.physics.add.sprite(120, 350, 'mario', 'mario/stand');
+    this.player = this.physics.add.sprite(96, 100, 'mario', 'mario/stand');
     this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(12, 16).setOffset(2, 0);
   }
 
   createCoin() {
-    this.coin = this.physics.add.staticSprite(300, 350, 'mario', 'coin/coin1');
+    this.coin = this.physics.add.staticSprite(300, 150, 'mario', 'coin/coin1');
     this.coin.setScale(2);
   }
 
   createGoal() {
-    this.goal = this.physics.add.staticSprite(750, 370, 'mario', 'flag');
+    const endPoint = this.worldLayer.findByIndex(5);
+    const x = endPoint?.pixelX ?? 3700;
+    const y = endPoint?.pixelY ?? 160;
+
+    this.goal = this.physics.add.staticSprite(x, y, 'mario', 'flag');
     this.goal.setScale(2);
   }
 
   createEnemies() {
     this.enemies = this.physics.add.group();
 
-    [
-      { x: 470, y: 385, speed: -35 },
-      { x: 680, y: 290, speed: -25 },
-    ].forEach(({ x, y, speed }) => {
+    const mapEnemies = this.levelMap
+      .getObjectLayer('enemies')
+      .objects.filter(({ name }) => name === 'goomba')
+      .slice(0, 12);
+    const enemyData = mapEnemies.length
+      ? mapEnemies.map(({ x, y }) => ({ x, y: y - 16, speed: -35 }))
+      : [{ x: 470, y: 180, speed: -35 }];
+
+    enemyData.forEach(({ x, y, speed }) => {
       const enemy = this.enemies.create(x, y, 'mario', 'goomba/walk1');
       enemy.setScale(2);
       enemy.setVelocityX(speed);
