@@ -152,6 +152,7 @@ class GameScene extends Phaser.Scene {
             },
             x: enemy.x,
             y: enemy.y,
+            type: enemy.getData('type'),
           })),
         getPlayer: () => ({
           body: {
@@ -298,6 +299,12 @@ class GameScene extends Phaser.Scene {
       repeat: -1,
     });
     this.anims.create({
+      key: 'turtle-walk',
+      frames: ['turtle/turtle0', 'turtle/turtle1'].map((frame) => ({ key: 'mario', frame })),
+      frameRate: 5,
+      repeat: -1,
+    });
+    this.anims.create({
       key: 'coin-spin',
       frames: ['coin/coin1', 'coin/coin2', 'coin/coin3'].map((frame) => ({
         key: 'mario',
@@ -430,16 +437,23 @@ class GameScene extends Phaser.Scene {
 
     const mapEnemies = this.levelMap
       .getObjectLayer('enemies')
-      .objects.filter(({ name }) => name === 'goomba')
-      .slice(0, 12);
+      .objects.filter(({ name }) => ['goomba', 'turtle'].includes(name))
+      .slice(0, 16);
     const enemyData = mapEnemies.length
-      ? mapEnemies.map(({ x, y }) => ({ x, y: y - 16 + this.levelOffsetY, speed: -35 }))
-      : [{ x: 470, y: 180 + this.levelOffsetY, speed: -35 }];
+      ? mapEnemies.map(({ name, x, y }) => ({
+          frame: name === 'turtle' ? 'turtle/turtle0' : 'goomba/walk1',
+          name,
+          speed: name === 'turtle' ? -25 : -35,
+          x,
+          y: y - 16 + this.levelOffsetY,
+        }))
+      : [{ frame: 'goomba/walk1', name: 'goomba', speed: -35, x: 470, y: 180 + this.levelOffsetY }];
 
-    enemyData.forEach(({ x, y, speed }) => {
-      const enemy = this.enemies.create(x, y, 'mario', 'goomba/walk1');
+    enemyData.forEach(({ frame, name, speed, x, y }) => {
+      const enemy = this.enemies.create(x, y, 'mario', frame);
       enemy.setScale(2);
-      enemy.play('goomba-walk');
+      enemy.setData('type', name);
+      enemy.play(name === 'turtle' ? 'turtle-walk' : 'goomba-walk');
       enemy.setVelocityX(speed);
       enemy.setBounceX(1);
       enemy.setCollideWorldBounds(true);
@@ -554,7 +568,7 @@ class GameScene extends Phaser.Scene {
     if (stomping || this.gameState.invincible) {
       // 踩踏會反彈玩家、停用敵人碰撞，再延遲移除其 Sprite。
       this.gameState = defeatEnemy(this.gameState);
-      enemy.setFrame('goomba/flat');
+      enemy.setFrame(enemy.getData('type') === 'turtle' ? 'turtle/shell' : 'goomba/flat');
       enemy.setVelocity(0, 0);
       enemy.body.enable = false;
       player.setVelocityY(-220);

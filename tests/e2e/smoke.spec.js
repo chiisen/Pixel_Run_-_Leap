@@ -59,6 +59,17 @@ test('物理世界寬度涵蓋完整關卡', async ({ page }) => {
   expect(bounds.width).toBeGreaterThan(800);
 });
 
+test('從地圖載入 Goomba 與龜型敵人', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const enemyTypes = await page.evaluate(() => [
+    ...new Set(window.__pixelRunLeap.getEnemies().map((enemy) => enemy.type)),
+  ]);
+  expect(enemyTypes).toEqual(expect.arrayContaining(['goomba', 'turtle']));
+});
+
 test('玩家從敵人上方落下時可以踩踏敵人', async ({ page }) => {
   await page.goto('/?test=1');
   await page.locator('#start-game').click();
