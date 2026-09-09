@@ -57,28 +57,30 @@ canvas {
 }
 
 .touch-controls button {
-  min-width: 4rem;
-  min-height: 4rem;
+  min-width: 5rem;
+  min-height: 5rem;
   border: 2px solid #ffffff;
   border-radius: 0.5rem;
   color: #ffffff;
-  background: rgb(16 26 58 / 80%);
+  background: rgb(16 26 58 / 85%);
   font: 700 1.5rem monospace;
   touch-action: none;
   user-select: none;
   pointer-events: auto;
 }
 
-.touch-controls button:active {
+.touch-controls button[data-active='true'] {
   background: #d94b4b;
 }
 
-#touch-jump {
-  margin-left: auto;
+#touch-left,
+#touch-right {
+  min-width: 4.5rem;
 }
 
+#touch-jump,
 #touch-fire {
-  margin-left: 0.5rem;
+  min-width: 5rem;
 }
 
 @media (pointer: coarse), (max-width: 700px) {

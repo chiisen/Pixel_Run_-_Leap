@@ -568,6 +568,7 @@ class GameScene extends Phaser.Scene {
         fontSize: '16px',
         stroke: '#000000',
         strokeThickness: 4,
+        wordWrap: { width: GAME_WIDTH - 32 },
       })
       .setScrollFactor(0);
 
@@ -835,6 +836,7 @@ class GameScene extends Phaser.Scene {
     const button = document.querySelector(`#${id}`);
     const setPressed = (pressed) => {
       this.touchState[direction] = pressed;
+      button.dataset.active = String(pressed);
     };
 
     button.addEventListener(
@@ -856,6 +858,7 @@ class GameScene extends Phaser.Scene {
     button.addEventListener('pointerleave', () => setPressed(false), {
       signal: this.domAbortController.signal,
     });
+    button.dataset.active = 'false';
   }
 
   cleanupScene() {
