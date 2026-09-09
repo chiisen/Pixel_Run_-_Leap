@@ -37,6 +37,8 @@ export function collectPowerUp(state, type) {
       return { ...base, power: 'super' };
     case 'star':
       return { ...base, invincible: true };
+    case 'flower':
+      return { ...base, power: 'fire' };
     case '1up':
       return { ...base, lives: state.lives + 1 };
     default:

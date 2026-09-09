@@ -106,6 +106,7 @@ class GameScene extends Phaser.Scene {
     this.createPlayer();
     this.createCollectibles();
     this.createEnemies();
+    this.createFireballs();
     this.createGoal();
     this.createHud();
     this.createDebugHud();
@@ -120,9 +121,11 @@ class GameScene extends Phaser.Scene {
       this,
     );
     this.physics.add.collider(this.enemies, this.worldLayer);
+    this.physics.add.collider(this.fireballs, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
     this.physics.add.overlap(this.player, this.coins, this.handleCoin, null, this);
     this.physics.add.overlap(this.player, this.powerUps, this.handlePowerUp, null, this);
+    this.physics.add.overlap(this.fireballs, this.enemies, this.handleFireballEnemy, null, this);
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.roundPixels = true;
@@ -134,6 +137,7 @@ class GameScene extends Phaser.Scene {
       callbackScope: this,
     });
     this.pipeCooldown = 0;
+    this.fireCooldown = 0;
     this.input.once('pointerdown', this.startAudio, this);
     this.input.keyboard.once('keydown', this.startAudio, this);
 
@@ -178,7 +182,7 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const { a, d, down, left, right, jump } = this.inputState;
+    const { a, d, down, fire, left, right, jump } = this.inputState;
 
     if (this.gameState.status !== 'playing') {
       return;
@@ -195,6 +199,9 @@ class GameScene extends Phaser.Scene {
 
     if (this.pipeCooldown > 0) {
       this.pipeCooldown -= 1;
+    }
+    if (this.fireCooldown > 0) {
+      this.fireCooldown -= 1;
     }
 
     if (down.isDown) {
@@ -225,6 +232,11 @@ class GameScene extends Phaser.Scene {
     if (jumpPressed && this.player.body.blocked.down) {
       this.player.setVelocityY(-300);
       this.playSfx('smb_jump-small');
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(fire) || this.touchFireQueued) {
+      this.touchFireQueued = false;
+      this.shootFireball();
     }
   }
 
@@ -293,6 +305,15 @@ class GameScene extends Phaser.Scene {
       repeat: -1,
     });
     this.anims.create({
+      key: 'mario-walk-fire',
+      frames: ['mario/walkFire1', 'mario/walkFire2', 'mario/walkFire3'].map((frame) => ({
+        key: 'mario',
+        frame,
+      })),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
       key: 'goomba-walk',
       frames: ['goomba/walk1', 'goomba/walk2'].map((frame) => ({ key: 'mario', frame })),
       frameRate: 5,
@@ -339,20 +360,34 @@ class GameScene extends Phaser.Scene {
   updatePlayerAnimation() {
     if (!this.player.body.blocked.down) {
       this.player.anims.stop();
-      this.player.setFrame(this.gameState.power === 'super' ? 'mario/jumpSuper' : 'mario/jump');
+      const jumpFrame = {
+        fire: 'mario/jumpFire',
+        small: 'mario/jump',
+        super: 'mario/jumpSuper',
+      }[this.gameState.power];
+      this.player.setFrame(jumpFrame);
       return;
     }
 
     if (this.player.body.velocity.x !== 0) {
       this.player.anims.play(
-        this.gameState.power === 'super' ? 'mario-walk-super' : 'mario-walk',
+        this.gameState.power === 'fire'
+          ? 'mario-walk-fire'
+          : this.gameState.power === 'super'
+            ? 'mario-walk-super'
+            : 'mario-walk',
         true,
       );
       return;
     }
 
     this.player.anims.stop();
-    this.player.setFrame(this.gameState.power === 'super' ? 'mario/standSuper' : 'mario/stand');
+    const standFrame = {
+      fire: 'mario/standFire',
+      small: 'mario/stand',
+      super: 'mario/standSuper',
+    }[this.gameState.power];
+    this.player.setFrame(standFrame);
   }
 
   createCollectibles() {
@@ -363,7 +398,7 @@ class GameScene extends Phaser.Scene {
     modifiers
       .filter(
         ({ name, type }) =>
-          type === 'powerUp' && ['coin', 'mushroom', 'star', '1up'].includes(name),
+          type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
       )
       .forEach(({ name, x, y }) => {
         const position = { x: x + 8, y: y - 8 + this.levelOffsetY };
@@ -378,6 +413,7 @@ class GameScene extends Phaser.Scene {
 
         const frame = {
           '1up': 'powerup/1up',
+          flower: 'powerup/flower1',
           mushroom: 'powerup/super',
           star: 'powerup/star1',
         }[name];
@@ -398,6 +434,7 @@ class GameScene extends Phaser.Scene {
 
     if (this.powerUps.countActive(true) === 0) {
       const fallback = [
+        { type: 'flower', frame: 'powerup/flower1', x: 620, y: 150 + this.levelOffsetY },
         { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 + this.levelOffsetY },
         { type: 'star', frame: 'powerup/star1', x: 820, y: 150 + this.levelOffsetY },
       ];
@@ -459,6 +496,10 @@ class GameScene extends Phaser.Scene {
       enemy.setCollideWorldBounds(true);
       enemy.body.setSize(14, 14).setOffset(1, 2);
     });
+  }
+
+  createFireballs() {
+    this.fireballs = this.physics.add.group();
   }
 
   createHud() {
@@ -537,6 +578,7 @@ class GameScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
       right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
       down: Phaser.Input.Keyboard.KeyCodes.DOWN,
+      fire: Phaser.Input.Keyboard.KeyCodes.Z,
       jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
       pause: Phaser.Input.Keyboard.KeyCodes.P,
     });
@@ -544,9 +586,19 @@ class GameScene extends Phaser.Scene {
 
     this.touchState = { left: false, right: false };
     this.touchJumpQueued = false;
+    this.touchFireQueued = false;
     this.domAbortController = new AbortController();
     this.bindTouchButton('touch-left', 'left');
     this.bindTouchButton('touch-right', 'right');
+    document.querySelector('#touch-fire').addEventListener(
+      'pointerdown',
+      (event) => {
+        event.preventDefault();
+        this.startAudio();
+        this.touchFireQueued = true;
+      },
+      { signal: this.domAbortController.signal },
+    );
     document.querySelector('#touch-jump').addEventListener(
       'pointerdown',
       (event) => {
@@ -647,6 +699,10 @@ class GameScene extends Phaser.Scene {
       player.setFrame('mario/standSuper');
     }
 
+    if (type === 'flower') {
+      player.setFrame('mario/standFire');
+    }
+
     if (type === 'star') {
       player.setTint(0xffff66);
       this.time.delayedCall(8000, () => {
@@ -657,6 +713,41 @@ class GameScene extends Phaser.Scene {
     }
 
     this.updateHud();
+  }
+
+  shootFireball() {
+    if (this.gameState.power !== 'fire' || this.fireCooldown > 0) {
+      return;
+    }
+
+    const direction = this.player.flipX ? -1 : 1;
+    const fireball = this.fireballs.create(
+      this.player.x + direction * 18,
+      this.player.y,
+      'mario',
+      'fire/fly1',
+    );
+    fireball.setVelocityX(direction * 240);
+    fireball.setBounce(1, 1);
+    fireball.body.setAllowGravity(false);
+    fireball.setCollideWorldBounds(true);
+    this.fireCooldown = 20;
+    this.playSfx('smb_fireball');
+    this.time.delayedCall(2500, () => fireball.destroy());
+  }
+
+  handleFireballEnemy(fireball, enemy) {
+    if (!fireball.active || !enemy.active) {
+      return;
+    }
+
+    this.gameState = defeatEnemy(this.gameState);
+    enemy.setFrame(enemy.getData('type') === 'turtle' ? 'turtle/shell' : 'goomba/flat');
+    enemy.body.enable = false;
+    fireball.destroy();
+    this.playSfx('smb_kick');
+    this.updateHud();
+    this.time.delayedCall(300, () => enemy.destroy());
   }
 
   startAudio() {
@@ -770,7 +861,9 @@ class GameScene extends Phaser.Scene {
       ? '無敵'
       : this.gameState.power === 'super'
         ? '超級'
-        : '小型';
+        : this.gameState.power === 'fire'
+          ? '火焰'
+          : '小型';
 
     this.hud.setText(
       `分數 ${this.gameState.score} | 金幣 ${this.gameState.coins} | 生命 ${this.gameState.lives} | 能力 ${power} | 時間 ${this.gameState.timeRemaining}`,

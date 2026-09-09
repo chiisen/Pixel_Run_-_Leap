@@ -49,6 +49,12 @@ describe('遊戲狀態', () => {
     expect(state).toMatchObject({ invincible: true, score: 1000 });
   });
 
+  it('取得火焰花時啟用火焰能力並增加分數', () => {
+    const state = collectPowerUp(createGameState(), 'flower');
+
+    expect(state).toMatchObject({ power: 'fire', score: 1000 });
+  });
+
   it('取得 1UP 時增加生命但不改變能力', () => {
     const state = collectPowerUp(createGameState({ lives: 2 }), '1up');
 
