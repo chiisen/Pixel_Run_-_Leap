@@ -74,6 +74,6 @@ export function tickTimer(state, seconds = 1) {
 }
 
 // 通關只改變流程狀態，不改動玩家目前累積的分數與資源。
-export function completeLevel(state) {
-  return { ...state, status: 'complete' };
+export function completeLevel(state, timeBonus = 0) {
+  return { ...state, score: state.score + timeBonus, status: 'complete' };
 }

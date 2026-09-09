@@ -90,4 +90,10 @@ describe('遊戲狀態', () => {
 
     expect(completeLevel(state)).toMatchObject({ status: 'complete', score: 500 });
   });
+
+  it('通關時可以把時間獎勵加入最終分數', () => {
+    const state = completeLevel(createGameState({ score: 500 }), 120);
+
+    expect(state).toMatchObject({ score: 620, status: 'complete' });
+  });
 });

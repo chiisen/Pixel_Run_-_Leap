@@ -583,6 +583,7 @@ class GameScene extends Phaser.Scene {
       pause: Phaser.Input.Keyboard.KeyCodes.P,
     });
     this.input.keyboard.on('keydown-R', this.restartGame, this);
+    this.input.keyboard.on('keydown-T', this.returnToTitle, this);
 
     this.touchState = { left: false, right: false };
     this.touchJumpQueued = false;
@@ -675,6 +676,7 @@ class GameScene extends Phaser.Scene {
     this.playSfx('smb_mariodie');
 
     if (this.gameState.status === 'game-over') {
+      this.player.setFrame('mario/dead');
       this.player.setVelocity(0, 0);
     } else {
       this.player.setPosition(this.spawnPosition.x, this.spawnPosition.y);
@@ -797,12 +799,20 @@ class GameScene extends Phaser.Scene {
   cleanupScene() {
     this.domAbortController.abort();
     this.input.keyboard.off('keydown-R', this.restartGame, this);
+    this.input.keyboard.off('keydown-T', this.returnToTitle, this);
     this.music?.stop();
   }
 
   restartGame() {
     if (this.gameState.status !== 'playing') {
       this.scene.restart();
+    }
+  }
+
+  returnToTitle() {
+    if (this.gameState.status !== 'playing') {
+      document.querySelector('#start-game').hidden = true;
+      this.scene.start('TitleScene');
     }
   }
 
@@ -833,7 +843,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.gameState = completeLevel(this.gameState);
+    this.gameState = completeLevel(this.gameState, this.gameState.timeRemaining * 10);
     this.updateHud();
     this.playSfx('smb_flagpole');
     this.showResultIfFinished();
@@ -846,11 +856,13 @@ class GameScene extends Phaser.Scene {
 
     if (this.gameState.status === 'complete') {
       this.resultShown = true;
-      this.resultText.setText('過關！\n按 R 重新開始').setVisible(true);
+      this.resultText
+        .setText(`過關！\n最終分數 ${this.gameState.score}\n按 R 重來 / T 返回標題`)
+        .setVisible(true);
       this.player.setVelocity(0, 0);
     } else if (this.gameState.status === 'game-over') {
       this.resultShown = true;
-      this.resultText.setText('遊戲結束\n按 R 重新開始').setVisible(true);
+      this.resultText.setText('遊戲結束\n按 R 重來 / T 返回標題').setVisible(true);
       this.playSfx('smb_gameover');
       this.player.setVelocity(0, 0);
     }
