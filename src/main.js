@@ -88,6 +88,9 @@ class GameScene extends Phaser.Scene {
 
   create() {
     // 目前先以單一場景驗證素材、物理與遊戲狀態可以正常串接。
+    const query = new URLSearchParams(window.location.search);
+    this.debugMode = query.has('debug');
+    this.testMode = query.has('test');
     this.createAnimations();
     this.createBackground();
     this.createLevel();
@@ -96,6 +99,7 @@ class GameScene extends Phaser.Scene {
     this.createEnemies();
     this.createGoal();
     this.createHud();
+    this.createDebugHud();
     this.createInput();
 
     this.physics.add.collider(this.player, this.worldLayer);
@@ -118,6 +122,12 @@ class GameScene extends Phaser.Scene {
 
     // 供 Playwright 與 AI 測試確認資產載入及場景初始化已完成。
     window.__pixelRunLeapReady = true;
+    if (this.debugMode || this.testMode) {
+      window.__pixelRunLeap = {
+        getPlayer: () => ({ x: this.player.x, y: this.player.y }),
+        getState: () => ({ ...this.gameState }),
+      };
+    }
   }
 
   update() {
@@ -141,6 +151,7 @@ class GameScene extends Phaser.Scene {
     }
 
     this.updatePlayerAnimation();
+    this.updateDebugHud();
 
     const jumpPressed = Phaser.Input.Keyboard.JustDown(jump) || this.touchJumpQueued;
     this.touchJumpQueued = false;
@@ -363,6 +374,36 @@ class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setVisible(false);
     this.updateHud();
+  }
+
+  createDebugHud() {
+    if (!this.debugMode) {
+      return;
+    }
+
+    this.debugHud = this.add
+      .text(16, 48, '', {
+        color: '#9ff7c8',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setScrollFactor(0);
+  }
+
+  updateDebugHud() {
+    if (!this.debugHud) {
+      return;
+    }
+
+    this.debugHud.setText(
+      [
+        `FPS ${Math.floor(this.game.loop.actualFps)}`,
+        `座標 x:${Math.round(this.player.x)} y:${Math.round(this.player.y)}`,
+        `狀態 ${this.gameState.status} 能力 ${this.gameState.power}`,
+      ].join('\n'),
+    );
   }
 
   createInput() {

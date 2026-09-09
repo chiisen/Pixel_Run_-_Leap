@@ -26,3 +26,12 @@ test('shows touch controls on a mobile viewport', async ({ page }) => {
   await expect(page.locator('#touch-right')).toBeVisible();
   await expect(page.locator('#touch-jump')).toBeVisible();
 });
+
+test('exposes deterministic debug state in test mode', async ({ page }) => {
+  await page.goto('/?debug=1&test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const state = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(state).toMatchObject({ lives: 3, status: 'playing', timeRemaining: 300 });
+});

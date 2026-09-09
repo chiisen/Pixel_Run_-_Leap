@@ -46,8 +46,8 @@ npx playwright install chromium
 
 ## 開發輔助
 
-- `?debug=1`：預留給碰撞框、FPS、座標與遊戲狀態資訊。
-- `?test=1`：預留給固定初始狀態與可重現關卡。
+- `?debug=1`：顯示 Phaser 碰撞框、FPS、座標、狀態與能力資訊。
+- `?test=1`：啟用固定初始狀態與 `window.__pixelRunLeap` 測試查詢介面。
 - Vitest：測試不依賴 Phaser 渲染的純 JavaScript 遊戲規則。
 - Playwright：測試遊戲啟動、畫面、Console 錯誤與瀏覽器流程。
 - VS Code 儲存時使用 Prettier 格式化，並套用 ESLint 修正。
