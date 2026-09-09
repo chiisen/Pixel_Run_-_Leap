@@ -246,11 +246,6 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.inputState.pause)) {
-      this.togglePause();
-      return;
-    }
-
     if (this.gameState.paused) {
       return;
     }
@@ -643,6 +638,7 @@ class GameScene extends Phaser.Scene {
     });
     this.input.keyboard.on('keydown-R', this.restartGame, this);
     this.input.keyboard.on('keydown-T', this.returnToTitle, this);
+    this.input.keyboard.on('keydown-P', this.togglePause, this);
 
     this.touchState = { left: false, right: false };
     this.touchJumpQueued = false;
@@ -865,6 +861,7 @@ class GameScene extends Phaser.Scene {
     this.domAbortController.abort();
     this.input.keyboard.off('keydown-R', this.restartGame, this);
     this.input.keyboard.off('keydown-T', this.returnToTitle, this);
+    this.input.keyboard.off('keydown-P', this.togglePause, this);
     this.music?.stop();
   }
 

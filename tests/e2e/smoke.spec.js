@@ -36,6 +36,48 @@ test('exposes deterministic debug state in test mode', async ({ page }) => {
   expect(state).toMatchObject({ lives: 3, status: 'playing', timeRemaining: 300 });
 });
 
+test('手機觸控按鈕可讓玩家向右移動', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const startX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  await page.locator('#touch-right').dispatchEvent('pointerdown');
+  await page.waitForTimeout(250);
+  await page.locator('#touch-right').dispatchEvent('pointerup');
+  const endX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+
+  expect(endX).toBeGreaterThan(startX);
+});
+
+test('按下 P 鍵之後物理停止並顯示暫停文字', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const movingStart = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  await page.locator('canvas').click();
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(50);
+  await page.keyboard.up('ArrowRight');
+  const moved = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  expect(moved).toBeGreaterThan(movingStart);
+
+  await page.locator('canvas').press('p');
+  const paused = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(paused.paused).toBe(true);
+
+  const duringPause = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  await page.waitForTimeout(400);
+  const pausedStill = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  expect(pausedStill).toBe(duringPause);
+
+  await page.locator('canvas').press('p');
+  const resumed = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(resumed.paused).toBe(false);
+});
+
 test('moves the player with keyboard input', async ({ page }) => {
   await page.goto('/?test=1');
   await page.locator('#start-game').click();
