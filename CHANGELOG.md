@@ -8,6 +8,8 @@
 
 ### Added
 
+- 建立不可變的遊戲狀態模組，支援初始狀態、金幣、生命、倒數與通關狀態。
+- 新增中文 Vitest 單元測試，覆蓋遊戲狀態的核心行為。
 - 建立專案規範檔 `AGENTS.md`、`CLAUDE.md` 與 `GEMINI.md`，三份內容保持同步。
 - 確認使用 Phaser 3 + JavaScript 製作遊戲。
 - 設計單元測試以 Vitest 為主，瀏覽器測試作為 Phaser 整合驗證。

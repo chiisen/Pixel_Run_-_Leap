@@ -1,0 +1,2 @@
+# Preserve whitespace in imported source assets from the reference project.
+public/assets/maps/super-mario.json -whitespace

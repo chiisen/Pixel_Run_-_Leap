@@ -3,10 +3,16 @@ import { expect, test } from '@playwright/test';
 test('loads the Pixel Run & Leap shell without browser errors', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
 
   await page.goto('/');
 
   await expect(page).toHaveTitle('Pixel Run & Leap');
   await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   expect(errors).toEqual([]);
 });
