@@ -13,6 +13,7 @@ test('loads the Pixel Run & Leap shell without browser errors', async ({ page })
 
   await expect(page).toHaveTitle('Pixel Run & Leap');
   await expect(page.locator('canvas')).toBeVisible();
+  await page.locator('#start-game').click();
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   expect(errors).toEqual([]);
 });

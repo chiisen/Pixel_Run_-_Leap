@@ -31,6 +31,51 @@ class PreloadScene extends Phaser.Scene {
   }
 
   create() {
+    this.scene.start('TitleScene');
+  }
+}
+
+class TitleScene extends Phaser.Scene {
+  constructor() {
+    super('TitleScene');
+  }
+
+  create() {
+    const startButton = document.querySelector('#start-game');
+    startButton.hidden = false;
+
+    this.cameras.main.setBackgroundColor('#101a3a');
+    this.add
+      .text(GAME_WIDTH / 2, 150, 'Pixel Run & Leap', {
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontSize: '42px',
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(GAME_WIDTH / 2, 260, '開始遊戲', {
+        color: '#f7d774',
+        backgroundColor: '#284b8f',
+        fontFamily: 'sans-serif',
+        fontSize: '24px',
+        padding: { x: 24, y: 14 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.startGame());
+
+    startButton.addEventListener('click', () => this.startGame(), { once: true });
+    this.input.keyboard.once('keydown-SPACE', () => this.startGame());
+    this.input.keyboard.once('keydown-ENTER', () => this.startGame());
+  }
+
+  startGame() {
+    if (this.scene.isActive('GameScene')) {
+      return;
+    }
+
+    document.querySelector('#start-game').hidden = true;
     this.scene.start('GameScene');
   }
 }
@@ -492,5 +537,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [PreloadScene, GameScene],
+  scene: [PreloadScene, TitleScene, GameScene],
 });
