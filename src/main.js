@@ -46,8 +46,7 @@ class GameScene extends Phaser.Scene {
     this.createBackground();
     this.createLevel();
     this.createPlayer();
-    this.createCoin();
-    this.createPowerUps();
+    this.createCollectibles();
     this.createEnemies();
     this.createGoal();
     this.createHud();
@@ -56,7 +55,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.worldLayer);
     this.physics.add.collider(this.enemies, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
-    this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
+    this.physics.add.overlap(this.player, this.coins, this.handleCoin, null, this);
     this.physics.add.overlap(this.player, this.powerUps, this.handlePowerUp, null, this);
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -132,22 +131,60 @@ class GameScene extends Phaser.Scene {
     this.player.body.setSize(12, 16).setOffset(2, 0);
   }
 
-  createCoin() {
-    this.coin = this.physics.add.staticSprite(300, 150, 'mario', 'coin/coin1');
-    this.coin.setScale(2);
+  createCollectibles() {
+    const modifiers = this.levelMap.getObjectLayer('modifiers')?.objects ?? [];
+    this.coins = this.physics.add.staticGroup();
+    this.powerUps = this.physics.add.staticGroup();
+
+    modifiers
+      .filter(
+        ({ name, type }) =>
+          type === 'powerUp' && ['coin', 'mushroom', 'star', '1up'].includes(name),
+      )
+      .forEach(({ name, x, y }) => {
+        const position = { x: x + 8, y: y - 8 };
+
+        if (name === 'coin') {
+          this.coins.create(position.x, position.y, 'mario', 'coin/coin1').setScale(2);
+          return;
+        }
+
+        const frame = {
+          '1up': 'powerup/1up',
+          mushroom: 'powerup/super',
+          star: 'powerup/star1',
+        }[name];
+        const powerUp = this.powerUps.create(position.x, position.y, 'mario', frame);
+        powerUp.setScale(2);
+        powerUp.setData('type', name);
+      });
+
+    if (this.coins.countActive(true) === 0) {
+      this.coins.create(300, 150, 'mario', 'coin/coin1').setScale(2);
+    }
+
+    if (this.powerUps.countActive(true) === 0) {
+      const fallback = [
+        { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 },
+        { type: 'star', frame: 'powerup/star1', x: 820, y: 150 },
+      ];
+      fallback.forEach(({ type, frame, x, y }) => {
+        const powerUp = this.powerUps.create(x, y, 'mario', frame);
+        powerUp.setScale(2);
+        powerUp.setData('type', type);
+      });
+    }
   }
 
-  createPowerUps() {
-    this.powerUps = this.physics.add.staticGroup();
-    [
-      { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 },
-      { type: 'star', frame: 'powerup/star1', x: 820, y: 150 },
-      { type: '1up', frame: 'powerup/1up', x: 1200, y: 150 },
-    ].forEach(({ type, frame, x, y }) => {
-      const powerUp = this.powerUps.create(x, y, 'mario', frame);
-      powerUp.setScale(2);
-      powerUp.setData('type', type);
-    });
+  handleCoin(player, coin) {
+    if (!coin.active) {
+      return;
+    }
+
+    this.gameState = collectCoin(this.gameState);
+    coin.destroy();
+    this.playSfx('smb_coin');
+    this.updateHud();
   }
 
   createGoal() {
@@ -226,17 +263,6 @@ class GameScene extends Phaser.Scene {
       this.startAudio();
       this.touchJumpQueued = true;
     });
-  }
-
-  collectCoin() {
-    if (!this.coin.active) {
-      return;
-    }
-
-    this.gameState = collectCoin(this.gameState);
-    this.coin.destroy();
-    this.playSfx('smb_coin');
-    this.updateHud();
   }
 
   handleEnemyContact(player, enemy) {
