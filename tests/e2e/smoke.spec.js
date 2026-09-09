@@ -49,3 +49,32 @@ test('moves the player with keyboard input', async ({ page }) => {
 
   expect(endX).toBeGreaterThan(startX);
 });
+
+test('玩家從敵人上方落下時可以踩踏敵人', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const enemy = await page.evaluate(() => window.__pixelRunLeap.getEnemies()[0]);
+  await page.evaluate(({ x, y }) => {
+    window.__pixelRunLeap.setPlayerPosition(x, y - 40);
+  }, enemy);
+  await page.waitForTimeout(500);
+
+  const state = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(state.score).toBeGreaterThanOrEqual(100);
+});
+
+test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.evaluate(() => window.__pixelRunLeap.setPlayerPosition(100, 1000));
+    await page.waitForTimeout(350);
+  }
+
+  const state = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(state).toMatchObject({ lives: 0, status: 'game-over' });
+});

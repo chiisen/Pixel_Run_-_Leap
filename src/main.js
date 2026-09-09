@@ -126,8 +126,33 @@ class GameScene extends Phaser.Scene {
     window.__pixelRunLeapReady = true;
     if (this.debugMode || this.testMode) {
       window.__pixelRunLeap = {
-        getPlayer: () => ({ x: this.player.x, y: this.player.y }),
+        getEnemies: () =>
+          this.enemies.getChildren().map((enemy) => ({
+            active: enemy.active,
+            body: {
+              bottom: enemy.body.bottom,
+              top: enemy.body.top,
+              touching: { ...enemy.body.touching },
+              velocityY: enemy.body.velocity.y,
+            },
+            x: enemy.x,
+            y: enemy.y,
+          })),
+        getPlayer: () => ({
+          body: {
+            bottom: this.player.body.bottom,
+            top: this.player.body.top,
+            touching: { ...this.player.body.touching },
+            velocityY: this.player.body.velocity.y,
+          },
+          x: this.player.x,
+          y: this.player.y,
+        }),
         getState: () => ({ ...this.gameState }),
+        setPlayerPosition: (x, y) => {
+          this.player.setPosition(x, y);
+          this.player.setVelocityY(100);
+        },
       };
     }
   }
@@ -148,6 +173,11 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.gameState.paused) {
+      return;
+    }
+
+    if (this.player.y > this.levelMap.heightInPixels + 64) {
+      this.handlePlayerDeath();
       return;
     }
 
@@ -462,7 +492,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    const stomping = player.body.velocity.y > 0 && player.body.bottom <= enemy.body.top + 12;
+    const stomping = player.body.touching.down && enemy.body.touching.up;
 
     if (stomping || this.gameState.invincible) {
       // 踩踏會反彈玩家、停用敵人碰撞，再延遲移除其 Sprite。
@@ -474,11 +504,27 @@ class GameScene extends Phaser.Scene {
       this.playSfx('smb_stomp');
       this.time.delayedCall(300, () => enemy.destroy());
     } else {
-      // 非踩踏碰撞會扣除生命，並把玩家送回目前切片的起點。
-      this.gameState = damagePlayer(this.gameState);
-      player.setPosition(120, 350);
-      player.setVelocity(0, -180);
-      this.playSfx('smb_mariodie');
+      // 非踩踏碰撞使用與掉出地圖相同的死亡流程。
+      this.handlePlayerDeath();
+    }
+
+    this.updateHud();
+    this.showResultIfFinished();
+  }
+
+  handlePlayerDeath() {
+    if (this.gameState.status !== 'playing') {
+      return;
+    }
+
+    this.gameState = damagePlayer(this.gameState);
+    this.playSfx('smb_mariodie');
+
+    if (this.gameState.status === 'game-over') {
+      this.player.setVelocity(0, 0);
+    } else {
+      this.player.setPosition(96, 100);
+      this.player.setVelocity(0, -180);
     }
 
     this.updateHud();
