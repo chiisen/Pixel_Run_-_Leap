@@ -23,6 +23,8 @@ class PreloadScene extends Phaser.Scene {
     // 參考專案的 atlas 同時包含玩家、金幣、磚塊與敵人等像素素材。
     this.load.atlas('mario', '/assets/mario-sprites.png', '/assets/mario-sprites.json');
     this.load.image('clouds', '/assets/images/clouds.png');
+    this.load.audio('overworld', '/assets/music/overworld.mp3');
+    this.load.audioSprite('sfx', '/assets/audio/sfx.json', ['/assets/audio/sfx.mp3']);
   }
 
   create() {
@@ -59,6 +61,8 @@ class GameScene extends Phaser.Scene {
       callback: this.tickGameTimer,
       callbackScope: this,
     });
+    this.input.once('pointerdown', this.startAudio, this);
+    this.input.keyboard.once('keydown', this.startAudio, this);
 
     // 供 Playwright 與 AI 測試確認資產載入及場景初始化已完成。
     window.__pixelRunLeapReady = true;
@@ -89,6 +93,7 @@ class GameScene extends Phaser.Scene {
 
     if (jumpPressed && this.player.body.blocked.down) {
       this.player.setVelocityY(-300);
+      this.playSfx('smb_jump-small');
     }
   }
 
@@ -180,6 +185,7 @@ class GameScene extends Phaser.Scene {
     this.bindTouchButton('touch-right', 'right');
     document.querySelector('#touch-jump').addEventListener('pointerdown', (event) => {
       event.preventDefault();
+      this.startAudio();
       this.touchJumpQueued = true;
     });
   }
@@ -191,6 +197,7 @@ class GameScene extends Phaser.Scene {
 
     this.gameState = collectCoin(this.gameState);
     this.coin.destroy();
+    this.playSfx('smb_coin');
     this.updateHud();
   }
 
@@ -208,16 +215,35 @@ class GameScene extends Phaser.Scene {
       enemy.setVelocity(0, 0);
       enemy.body.enable = false;
       player.setVelocityY(-220);
+      this.playSfx('smb_stomp');
       this.time.delayedCall(300, () => enemy.destroy());
     } else {
       // 非踩踏碰撞會扣除生命，並把玩家送回目前切片的起點。
       this.gameState = damagePlayer(this.gameState);
       player.setPosition(120, 350);
       player.setVelocity(0, -180);
+      this.playSfx('smb_mariodie');
     }
 
     this.updateHud();
     this.showResultIfFinished();
+  }
+
+  startAudio() {
+    if (this.audioStarted) {
+      return;
+    }
+
+    this.sound.context.resume();
+    this.music = this.sound.add('overworld', { loop: true, volume: 0.35 });
+    this.music.play();
+    this.audioStarted = true;
+  }
+
+  playSfx(key) {
+    if (this.audioStarted) {
+      this.sound.playAudioSprite('sfx', key);
+    }
   }
 
   bindTouchButton(id, direction) {
@@ -228,6 +254,7 @@ class GameScene extends Phaser.Scene {
 
     button.addEventListener('pointerdown', (event) => {
       event.preventDefault();
+      this.startAudio();
       setPressed(true);
       button.setPointerCapture(event.pointerId);
     });
@@ -253,6 +280,7 @@ class GameScene extends Phaser.Scene {
 
     this.gameState = completeLevel(this.gameState);
     this.updateHud();
+    this.playSfx('smb_flagpole');
     this.showResultIfFinished();
   }
 
@@ -262,6 +290,7 @@ class GameScene extends Phaser.Scene {
       this.player.setVelocity(0, 0);
     } else if (this.gameState.status === 'game-over') {
       this.resultText.setText('遊戲結束\n按 R 重新開始').setVisible(true);
+      this.playSfx('smb_gameover');
       this.player.setVelocity(0, 0);
     }
   }
