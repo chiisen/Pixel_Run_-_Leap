@@ -19,6 +19,7 @@
 - 新增玩家、Goomba、金幣與星星的像素動畫。
 - 新增 `Pixel Run & Leap` 標題畫面與 HTML 開始按鈕。
 - 實作 `?debug=1` 與 `?test=1` 輔助模式，供 AI 讀取 FPS、座標與遊戲狀態。
+- 新增 P 鍵暫停/繼續，並同步控制物理、倒數與音效。
 - 建立專案規範檔 `AGENTS.md`、`CLAUDE.md` 與 `GEMINI.md`，三份內容保持同步。
 - 確認使用 Phaser 3 + JavaScript 製作遊戲。
 - 設計單元測試以 Vitest 為主，瀏覽器測試作為 Phaser 整合驗證。

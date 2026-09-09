@@ -10,6 +10,7 @@ import {
   damagePlayer,
   defeatEnemy,
   tickTimer,
+  togglePause,
 } from './game/gameState.js';
 
 const GAME_WIDTH = 800;
@@ -137,6 +138,15 @@ class GameScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(restart)) {
         this.scene.restart();
       }
+      return;
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.inputState.pause)) {
+      this.togglePause();
+      return;
+    }
+
+    if (this.gameState.paused) {
       return;
     }
 
@@ -373,6 +383,18 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setVisible(false);
+    this.pauseText = this.add
+      .text(400, 180, '已暫停\n按 P 繼續', {
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        fontSize: '24px',
+        align: 'center',
+        backgroundColor: '#101a3acc',
+        padding: { x: 18, y: 12 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setVisible(false);
     this.updateHud();
   }
 
@@ -414,6 +436,7 @@ class GameScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
       right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
       jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      pause: Phaser.Input.Keyboard.KeyCodes.P,
       restart: Phaser.Input.Keyboard.KeyCodes.R,
     });
 
@@ -517,13 +540,25 @@ class GameScene extends Phaser.Scene {
   }
 
   tickGameTimer() {
-    if (this.gameState.status !== 'playing') {
+    if (this.gameState.status !== 'playing' || this.gameState.paused) {
       return;
     }
 
     this.gameState = tickTimer(this.gameState);
     this.updateHud();
     this.showResultIfFinished();
+  }
+
+  togglePause() {
+    this.gameState = togglePause(this.gameState);
+    this.physics.world.isPaused = this.gameState.paused;
+    this.pauseText.setVisible(this.gameState.paused);
+
+    if (this.gameState.paused) {
+      this.sound.pauseAll();
+    } else {
+      this.sound.resumeAll();
+    }
   }
 
   completeLevel() {

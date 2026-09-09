@@ -2,6 +2,7 @@ const DEFAULT_GAME_STATE = {
   coins: 0,
   invincible: false,
   lives: 3,
+  paused: false,
   power: 'small',
   score: 0,
   status: 'playing',
@@ -41,6 +42,11 @@ export function collectPowerUp(state, type) {
     default:
       return state;
   }
+}
+
+// 暫停不影響生命、分數與流程狀態，只由場景控制物理、計時與音效是否停止。
+export function togglePause(state) {
+  return { ...state, paused: !state.paused };
 }
 
 // 生命歸零才進入 Game Over，受傷但仍有生命時維持目前遊戲狀態。

@@ -16,6 +16,7 @@ describe('遊戲狀態', () => {
       coins: 0,
       invincible: false,
       lives: 3,
+      paused: false,
       power: 'small',
       score: 0,
       status: 'playing',
