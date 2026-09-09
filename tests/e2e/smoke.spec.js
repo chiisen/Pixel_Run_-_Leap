@@ -78,3 +78,26 @@ test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
   const state = await page.evaluate(() => window.__pixelRunLeap.getState());
   expect(state).toMatchObject({ lives: 0, status: 'game-over' });
 });
+
+test('Game Over 按 R 後重設狀態並恢復移動', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.evaluate(() => window.__pixelRunLeap.setPlayerPosition(100, 1000));
+    await page.waitForTimeout(350);
+  }
+
+  await page.keyboard.press('r');
+  await page.waitForTimeout(500);
+  const state = await page.evaluate(() => window.__pixelRunLeap.getState());
+  expect(state).toMatchObject({ lives: 3, status: 'playing' });
+
+  const startX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(250);
+  await page.keyboard.up('ArrowRight');
+  const endX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  expect(endX).toBeGreaterThan(startX);
+});

@@ -90,6 +90,12 @@ class GameScene extends Phaser.Scene {
 
   create() {
     // 目前先以單一場景驗證素材、物理與遊戲狀態可以正常串接。
+    // Phaser scene.restart() 會重用場景實例，因此必須在每次 create() 重設執行狀態。
+    this.gameState = createGameState();
+    this.resultShown = false;
+    this.audioStarted = false;
+    this.physics.world.isPaused = false;
+
     const query = new URLSearchParams(window.location.search);
     this.debugMode = query.has('debug');
     this.testMode = query.has('test');
@@ -159,12 +165,9 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const { a, d, left, right, jump, restart } = this.inputState;
+    const { a, d, left, right, jump } = this.inputState;
 
     if (this.gameState.status !== 'playing') {
-      if (Phaser.Input.Keyboard.JustDown(restart)) {
-        this.scene.restart();
-      }
       return;
     }
 
@@ -177,7 +180,7 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.player.y > this.levelMap.heightInPixels + 64) {
+    if (this.player.y > this.levelOffsetY + this.levelMap.heightInPixels + 64) {
       this.handlePlayerDeath();
       return;
     }
@@ -222,6 +225,10 @@ class GameScene extends Phaser.Scene {
     this.worldLayer = this.levelMap
       .createLayer('world', tileset, 0, 0)
       .setCollisionByProperty({ collide: true });
+    // 參考地圖高度小於遊戲視窗，將整張關卡貼齊底部，避免地板出現在畫面中央。
+    this.levelOffsetY = Math.max(0, GAME_HEIGHT - this.levelMap.heightInPixels);
+    this.worldLayer.y = this.levelOffsetY;
+    this.spawnPosition = { x: 96, y: 100 + this.levelOffsetY };
     this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
   }
 
@@ -271,7 +278,12 @@ class GameScene extends Phaser.Scene {
   }
 
   createPlayer() {
-    this.player = this.physics.add.sprite(96, 100, 'mario', 'mario/stand');
+    this.player = this.physics.add.sprite(
+      this.spawnPosition.x,
+      this.spawnPosition.y,
+      'mario',
+      'mario/stand',
+    );
     this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(12, 16).setOffset(2, 0);
@@ -307,7 +319,7 @@ class GameScene extends Phaser.Scene {
           type === 'powerUp' && ['coin', 'mushroom', 'star', '1up'].includes(name),
       )
       .forEach(({ name, x, y }) => {
-        const position = { x: x + 8, y: y - 8 };
+        const position = { x: x + 8, y: y - 8 + this.levelOffsetY };
 
         if (name === 'coin') {
           this.coins
@@ -331,13 +343,16 @@ class GameScene extends Phaser.Scene {
       });
 
     if (this.coins.countActive(true) === 0) {
-      this.coins.create(300, 150, 'mario', 'coin/coin1').setScale(2).play('coin-spin');
+      this.coins
+        .create(300, 150 + this.levelOffsetY, 'mario', 'coin/coin1')
+        .setScale(2)
+        .play('coin-spin');
     }
 
     if (this.powerUps.countActive(true) === 0) {
       const fallback = [
-        { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 },
-        { type: 'star', frame: 'powerup/star1', x: 820, y: 150 },
+        { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 + this.levelOffsetY },
+        { type: 'star', frame: 'powerup/star1', x: 820, y: 150 + this.levelOffsetY },
       ];
       fallback.forEach(({ type, frame, x, y }) => {
         const powerUp = this.powerUps.create(x, y, 'mario', frame);
@@ -364,7 +379,7 @@ class GameScene extends Phaser.Scene {
   createGoal() {
     const endPoint = this.worldLayer.findByIndex(5);
     const x = endPoint?.pixelX ?? 3700;
-    const y = endPoint?.pixelY ?? 160;
+    const y = (endPoint?.pixelY ?? 160) + this.levelOffsetY;
 
     this.goal = this.physics.add.staticSprite(x, y, 'mario', 'flag');
     this.goal.setScale(2);
@@ -378,8 +393,8 @@ class GameScene extends Phaser.Scene {
       .objects.filter(({ name }) => name === 'goomba')
       .slice(0, 12);
     const enemyData = mapEnemies.length
-      ? mapEnemies.map(({ x, y }) => ({ x, y: y - 16, speed: -35 }))
-      : [{ x: 470, y: 180, speed: -35 }];
+      ? mapEnemies.map(({ x, y }) => ({ x, y: y - 16 + this.levelOffsetY, speed: -35 }))
+      : [{ x: 470, y: 180 + this.levelOffsetY, speed: -35 }];
 
     enemyData.forEach(({ x, y, speed }) => {
       const enemy = this.enemies.create(x, y, 'mario', 'goomba/walk1');
@@ -469,8 +484,8 @@ class GameScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
       jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
       pause: Phaser.Input.Keyboard.KeyCodes.P,
-      restart: Phaser.Input.Keyboard.KeyCodes.R,
     });
+    this.input.keyboard.on('keydown-R', this.restartGame, this);
 
     this.touchState = { left: false, right: false };
     this.touchJumpQueued = false;
@@ -524,7 +539,7 @@ class GameScene extends Phaser.Scene {
     if (this.gameState.status === 'game-over') {
       this.player.setVelocity(0, 0);
     } else {
-      this.player.setPosition(96, 100);
+      this.player.setPosition(this.spawnPosition.x, this.spawnPosition.y);
       this.player.setVelocity(0, -180);
     }
 
@@ -604,7 +619,14 @@ class GameScene extends Phaser.Scene {
 
   cleanupScene() {
     this.domAbortController.abort();
+    this.input.keyboard.off('keydown-R', this.restartGame, this);
     this.music?.stop();
+  }
+
+  restartGame() {
+    if (this.gameState.status !== 'playing') {
+      this.scene.restart();
+    }
   }
 
   tickGameTimer() {
