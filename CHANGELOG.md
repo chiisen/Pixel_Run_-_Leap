@@ -27,6 +27,7 @@
 - 修正 Game Over 音效因終局碰撞回呼重複觸發而連續播放的問題。
 - 修正 Game Over 後按 R 無法重設場景與恢復玩家控制的問題。
 - 將 Tiled 地圖與關卡物件貼齊視窗底部，修正地板出現在畫面中央。
+- 將 Phaser 物理世界寬度同步到完整地圖，修正玩家走到中途被 800px 邊界擋住。
 - 建立專案規範檔 `AGENTS.md`、`CLAUDE.md` 與 `GEMINI.md`，三份內容保持同步。
 - 確認使用 Phaser 3 + JavaScript 製作遊戲。
 - 設計單元測試以 Vitest 為主，瀏覽器測試作為 Phaser 整合驗證。

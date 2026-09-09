@@ -156,6 +156,10 @@ class GameScene extends Phaser.Scene {
           y: this.player.y,
         }),
         getState: () => ({ ...this.gameState }),
+        getWorldBounds: () => ({
+          height: this.physics.world.bounds.height,
+          width: this.physics.world.bounds.width,
+        }),
         setPlayerPosition: (x, y) => {
           this.player.setPosition(x, y);
           this.player.setVelocityY(100);
@@ -229,6 +233,7 @@ class GameScene extends Phaser.Scene {
     this.levelOffsetY = Math.max(0, GAME_HEIGHT - this.levelMap.heightInPixels);
     this.worldLayer.y = this.levelOffsetY;
     this.spawnPosition = { x: 96, y: 100 + this.levelOffsetY };
+    this.physics.world.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
     this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
   }
 

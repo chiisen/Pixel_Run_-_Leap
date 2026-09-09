@@ -50,6 +50,15 @@ test('moves the player with keyboard input', async ({ page }) => {
   expect(endX).toBeGreaterThan(startX);
 });
 
+test('物理世界寬度涵蓋完整關卡', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const bounds = await page.evaluate(() => window.__pixelRunLeap.getWorldBounds());
+  expect(bounds.width).toBeGreaterThan(800);
+});
+
 test('玩家從敵人上方落下時可以踩踏敵人', async ({ page }) => {
   await page.goto('/?test=1');
   await page.locator('#start-game').click();
