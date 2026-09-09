@@ -6,6 +6,7 @@ import {
   createGameState,
   damagePlayer,
   defeatEnemy,
+  collectPowerUp,
   tickTimer,
 } from '../../src/game/gameState.js';
 
@@ -13,7 +14,9 @@ describe('遊戲狀態', () => {
   it('建立預設的遊戲進行狀態', () => {
     expect(createGameState()).toEqual({
       coins: 0,
+      invincible: false,
       lives: 3,
+      power: 'small',
       score: 0,
       status: 'playing',
       timeRemaining: 300,
@@ -31,6 +34,24 @@ describe('遊戲狀態', () => {
     const state = createGameState({ lives: 2 });
 
     expect(defeatEnemy(state)).toMatchObject({ score: 100, lives: 2 });
+  });
+
+  it('取得蘑菇時變大並增加分數', () => {
+    const state = collectPowerUp(createGameState(), 'mushroom');
+
+    expect(state).toMatchObject({ power: 'super', score: 1000 });
+  });
+
+  it('取得星星時啟用無敵並增加分數', () => {
+    const state = collectPowerUp(createGameState(), 'star');
+
+    expect(state).toMatchObject({ invincible: true, score: 1000 });
+  });
+
+  it('取得 1UP 時增加生命但不改變能力', () => {
+    const state = collectPowerUp(createGameState({ lives: 2 }), '1up');
+
+    expect(state).toMatchObject({ lives: 3, power: 'small', score: 1000 });
   });
 
   it('玩家受傷時減少生命且不修改原始狀態', () => {

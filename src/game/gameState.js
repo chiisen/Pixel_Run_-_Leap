@@ -1,6 +1,8 @@
 const DEFAULT_GAME_STATE = {
   coins: 0,
+  invincible: false,
   lives: 3,
+  power: 'small',
   score: 0,
   status: 'playing',
   timeRemaining: 300,
@@ -23,6 +25,22 @@ export function collectCoin(state, amount = 1) {
 // 踩踏敵人固定增加 100 分，生命與流程狀態維持不變。
 export function defeatEnemy(state) {
   return { ...state, score: state.score + 100 };
+}
+
+// 道具效果集中在狀態層，畫面只負責呈現能力並處理碰撞。
+export function collectPowerUp(state, type) {
+  const base = { ...state, score: state.score + 1000 };
+
+  switch (type) {
+    case 'mushroom':
+      return { ...base, power: 'super' };
+    case 'star':
+      return { ...base, invincible: true };
+    case '1up':
+      return { ...base, lives: state.lives + 1 };
+    default:
+      return state;
+  }
 }
 
 // 生命歸零才進入 Game Over，受傷但仍有生命時維持目前遊戲狀態。

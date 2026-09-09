@@ -4,6 +4,7 @@ import './styles.css';
 
 import {
   collectCoin,
+  collectPowerUp,
   completeLevel,
   createGameState,
   damagePlayer,
@@ -46,6 +47,7 @@ class GameScene extends Phaser.Scene {
     this.createLevel();
     this.createPlayer();
     this.createCoin();
+    this.createPowerUps();
     this.createEnemies();
     this.createGoal();
     this.createHud();
@@ -55,6 +57,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.enemies, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
     this.physics.add.overlap(this.player, this.coin, () => this.collectCoin());
+    this.physics.add.overlap(this.player, this.powerUps, this.handlePowerUp, null, this);
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.roundPixels = true;
@@ -132,6 +135,19 @@ class GameScene extends Phaser.Scene {
   createCoin() {
     this.coin = this.physics.add.staticSprite(300, 150, 'mario', 'coin/coin1');
     this.coin.setScale(2);
+  }
+
+  createPowerUps() {
+    this.powerUps = this.physics.add.staticGroup();
+    [
+      { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 },
+      { type: 'star', frame: 'powerup/star1', x: 820, y: 150 },
+      { type: '1up', frame: 'powerup/1up', x: 1200, y: 150 },
+    ].forEach(({ type, frame, x, y }) => {
+      const powerUp = this.powerUps.create(x, y, 'mario', frame);
+      powerUp.setScale(2);
+      powerUp.setData('type', type);
+    });
   }
 
   createGoal() {
@@ -230,7 +246,7 @@ class GameScene extends Phaser.Scene {
 
     const stomping = player.body.velocity.y > 0 && player.body.bottom <= enemy.body.top + 12;
 
-    if (stomping) {
+    if (stomping || this.gameState.invincible) {
       // 踩踏會反彈玩家、停用敵人碰撞，再延遲移除其 Sprite。
       this.gameState = defeatEnemy(this.gameState);
       enemy.setFrame('goomba/flat');
@@ -249,6 +265,32 @@ class GameScene extends Phaser.Scene {
 
     this.updateHud();
     this.showResultIfFinished();
+  }
+
+  handlePowerUp(player, powerUp) {
+    if (!powerUp.active) {
+      return;
+    }
+
+    const type = powerUp.getData('type');
+    this.gameState = collectPowerUp(this.gameState, type);
+    powerUp.destroy();
+    this.playSfx(type === '1up' ? 'smb_1-up' : 'smb_powerup');
+
+    if (type === 'mushroom') {
+      player.setFrame('mario/standSuper');
+    }
+
+    if (type === 'star') {
+      player.setTint(0xffff66);
+      this.time.delayedCall(8000, () => {
+        this.gameState = { ...this.gameState, invincible: false };
+        player.clearTint();
+        this.updateHud();
+      });
+    }
+
+    this.updateHud();
   }
 
   startAudio() {
@@ -318,8 +360,14 @@ class GameScene extends Phaser.Scene {
   }
 
   updateHud() {
+    const power = this.gameState.invincible
+      ? '無敵'
+      : this.gameState.power === 'super'
+        ? '超級'
+        : '小型';
+
     this.hud.setText(
-      `分數 ${this.gameState.score} | 金幣 ${this.gameState.coins} | 生命 ${this.gameState.lives}`,
+      `分數 ${this.gameState.score} | 金幣 ${this.gameState.coins} | 生命 ${this.gameState.lives} | 能力 ${power} | 時間 ${this.gameState.timeRemaining}`,
     );
   }
 }
