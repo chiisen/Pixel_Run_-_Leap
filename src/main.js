@@ -102,6 +102,7 @@ class GameScene extends Phaser.Scene {
     this.createAnimations();
     this.createBackground();
     this.createLevel();
+    this.createPipeData();
     this.createPlayer();
     this.createCollectibles();
     this.createEnemies();
@@ -111,7 +112,13 @@ class GameScene extends Phaser.Scene {
     this.createInput();
     this.events.once('shutdown', () => this.cleanupScene());
 
-    this.physics.add.collider(this.player, this.worldLayer);
+    this.physics.add.collider(
+      this.player,
+      this.worldLayer,
+      this.handlePlayerTileCollision,
+      null,
+      this,
+    );
     this.physics.add.collider(this.enemies, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
     this.physics.add.overlap(this.player, this.coins, this.handleCoin, null, this);
@@ -126,6 +133,7 @@ class GameScene extends Phaser.Scene {
       callback: this.tickGameTimer,
       callbackScope: this,
     });
+    this.pipeCooldown = 0;
     this.input.once('pointerdown', this.startAudio, this);
     this.input.keyboard.once('keydown', this.startAudio, this);
 
@@ -169,7 +177,7 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const { a, d, left, right, jump } = this.inputState;
+    const { a, d, down, left, right, jump } = this.inputState;
 
     if (this.gameState.status !== 'playing') {
       return;
@@ -182,6 +190,14 @@ class GameScene extends Phaser.Scene {
 
     if (this.gameState.paused) {
       return;
+    }
+
+    if (this.pipeCooldown > 0) {
+      this.pipeCooldown -= 1;
+    }
+
+    if (down.isDown) {
+      this.tryEnterPipe();
     }
 
     if (this.player.y > this.levelOffsetY + this.levelMap.heightInPixels + 64) {
@@ -235,6 +251,25 @@ class GameScene extends Phaser.Scene {
     this.spawnPosition = { x: 96, y: 100 + this.levelOffsetY };
     this.physics.world.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
     this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
+  }
+
+  createPipeData() {
+    const modifiers = this.levelMap.getObjectLayer('modifiers')?.objects ?? [];
+    this.pipes = modifiers
+      .filter(({ type }) => type === 'pipe')
+      .map(({ name, x, y, width, height, properties = [] }) => ({
+        direction: properties.find((property) => property.name === 'direction')?.value,
+        height,
+        name,
+        width,
+        x,
+        y: y + this.levelOffsetY,
+      }));
+    this.destinations = Object.fromEntries(
+      modifiers
+        .filter(({ type }) => type === 'dest')
+        .map(({ name, x, y }) => [name, { x, y: y + this.levelOffsetY }]),
+    );
   }
 
   createAnimations() {
@@ -487,6 +522,7 @@ class GameScene extends Phaser.Scene {
       d: Phaser.Input.Keyboard.KeyCodes.D,
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
       right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      down: Phaser.Input.Keyboard.KeyCodes.DOWN,
       jump: Phaser.Input.Keyboard.KeyCodes.SPACE,
       pause: Phaser.Input.Keyboard.KeyCodes.P,
     });
@@ -531,6 +567,37 @@ class GameScene extends Phaser.Scene {
 
     this.updateHud();
     this.showResultIfFinished();
+  }
+
+  handlePlayerTileCollision(player, tile) {
+    if (!tile?.properties?.callback || !player.body.touching.up) {
+      return;
+    }
+
+    this.worldLayer.removeTileAt(tile.x, tile.y);
+    this.playSfx('smb_breakblock');
+  }
+
+  tryEnterPipe() {
+    if (this.pipeCooldown > 0) {
+      return;
+    }
+
+    const pipe = this.pipes.find(
+      ({ direction, height, width, x, y }) =>
+        direction === 'down' &&
+        Math.abs(this.player.x - (x + width / 2)) < 18 &&
+        Math.abs(this.player.y - (y + height / 2)) < 24,
+    );
+    const destination = pipe && this.destinations[pipe.name];
+
+    if (!destination) {
+      return;
+    }
+
+    this.player.setPosition(destination.x + 8, destination.y - 16);
+    this.pipeCooldown = 30;
+    this.playSfx('smb_pipe');
   }
 
   handlePlayerDeath() {
