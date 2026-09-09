@@ -102,6 +102,7 @@ class GameScene extends Phaser.Scene {
     this.createHud();
     this.createDebugHud();
     this.createInput();
+    this.events.once('shutdown', () => this.cleanupScene());
 
     this.physics.add.collider(this.player, this.worldLayer);
     this.physics.add.collider(this.enemies, this.worldLayer);
@@ -442,13 +443,18 @@ class GameScene extends Phaser.Scene {
 
     this.touchState = { left: false, right: false };
     this.touchJumpQueued = false;
+    this.domAbortController = new AbortController();
     this.bindTouchButton('touch-left', 'left');
     this.bindTouchButton('touch-right', 'right');
-    document.querySelector('#touch-jump').addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      this.startAudio();
-      this.touchJumpQueued = true;
-    });
+    document.querySelector('#touch-jump').addEventListener(
+      'pointerdown',
+      (event) => {
+        event.preventDefault();
+        this.startAudio();
+        this.touchJumpQueued = true;
+      },
+      { signal: this.domAbortController.signal },
+    );
   }
 
   handleEnemyContact(player, enemy) {
@@ -528,15 +534,30 @@ class GameScene extends Phaser.Scene {
       this.touchState[direction] = pressed;
     };
 
-    button.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      this.startAudio();
-      setPressed(true);
-      button.setPointerCapture(event.pointerId);
+    button.addEventListener(
+      'pointerdown',
+      (event) => {
+        event.preventDefault();
+        this.startAudio();
+        setPressed(true);
+        button.setPointerCapture(event.pointerId);
+      },
+      { signal: this.domAbortController.signal },
+    );
+    button.addEventListener('pointerup', () => setPressed(false), {
+      signal: this.domAbortController.signal,
     });
-    button.addEventListener('pointerup', () => setPressed(false));
-    button.addEventListener('pointercancel', () => setPressed(false));
-    button.addEventListener('pointerleave', () => setPressed(false));
+    button.addEventListener('pointercancel', () => setPressed(false), {
+      signal: this.domAbortController.signal,
+    });
+    button.addEventListener('pointerleave', () => setPressed(false), {
+      signal: this.domAbortController.signal,
+    });
+  }
+
+  cleanupScene() {
+    this.domAbortController.abort();
+    this.music?.stop();
   }
 
   tickGameTimer() {
