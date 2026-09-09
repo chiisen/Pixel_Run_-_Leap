@@ -35,3 +35,17 @@ test('exposes deterministic debug state in test mode', async ({ page }) => {
   const state = await page.evaluate(() => window.__pixelRunLeap.getState());
   expect(state).toMatchObject({ lives: 3, status: 'playing', timeRemaining: 300 });
 });
+
+test('moves the player with keyboard input', async ({ page }) => {
+  await page.goto('/?test=1');
+  await page.locator('#start-game').click();
+  await page.waitForFunction(() => window.__pixelRunLeapReady === true);
+
+  const startX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(250);
+  await page.keyboard.up('ArrowRight');
+  const endX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
+
+  expect(endX).toBeGreaterThan(startX);
+});
