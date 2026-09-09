@@ -20,6 +20,11 @@ export function collectCoin(state, amount = 1) {
   };
 }
 
+// 踩踏敵人固定增加 100 分，生命與流程狀態維持不變。
+export function defeatEnemy(state) {
+  return { ...state, score: state.score + 100 };
+}
+
 // 生命歸零才進入 Game Over，受傷但仍有生命時維持目前遊戲狀態。
 export function damagePlayer(state) {
   const lives = Math.max(0, state.lives - 1);

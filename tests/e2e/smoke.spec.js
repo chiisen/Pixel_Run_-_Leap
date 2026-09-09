@@ -16,3 +16,12 @@ test('loads the Pixel Run & Leap shell without browser errors', async ({ page })
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   expect(errors).toEqual([]);
 });
+
+test('shows touch controls on a mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/');
+
+  await expect(page.locator('#touch-left')).toBeVisible();
+  await expect(page.locator('#touch-right')).toBeVisible();
+  await expect(page.locator('#touch-jump')).toBeVisible();
+});

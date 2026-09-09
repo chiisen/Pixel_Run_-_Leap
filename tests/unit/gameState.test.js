@@ -5,6 +5,7 @@ import {
   completeLevel,
   createGameState,
   damagePlayer,
+  defeatEnemy,
   tickTimer,
 } from '../../src/game/gameState.js';
 
@@ -24,6 +25,12 @@ describe('遊戲狀態', () => {
 
     expect(state.coins).toBe(1);
     expect(state.score).toBe(100);
+  });
+
+  it('擊敗敵人時增加 100 分且不改變生命', () => {
+    const state = createGameState({ lives: 2 });
+
+    expect(defeatEnemy(state)).toMatchObject({ score: 100, lives: 2 });
   });
 
   it('玩家受傷時減少生命且不修改原始狀態', () => {
