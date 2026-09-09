@@ -26,6 +26,11 @@ body {
   height: 100vh;
 }
 
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .start-game {
   position: fixed;
   top: 50%;

@@ -873,10 +873,15 @@ class GameScene extends Phaser.Scene {
 
 new Phaser.Game({
   type: Phaser.AUTO,
+  pixelArt: true,
   parent: 'game',
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: '#5c94fc',
+  render: {
+    antialias: false,
+    roundPixels: true,
+  },
   physics: {
     default: 'arcade',
     arcade: {
