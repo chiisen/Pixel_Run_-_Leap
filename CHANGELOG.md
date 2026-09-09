@@ -16,6 +16,7 @@
 - 載入參考專案的 Tiled 地圖、tileset 與地圖敵人資料，並啟用攝影機跟隨。
 - 新增蘑菇、星星與 1UP 道具，以及超級、無敵與增加生命效果。
 - 金幣與道具位置改由 Tiled `modifiers` 層建立，減少關卡座標硬編碼。
+- 新增玩家、Goomba、金幣與星星的像素動畫。
 - 建立專案規範檔 `AGENTS.md`、`CLAUDE.md` 與 `GEMINI.md`，三份內容保持同步。
 - 確認使用 Phaser 3 + JavaScript 製作遊戲。
 - 設計單元測試以 Vitest 為主，瀏覽器測試作為 Phaser 整合驗證。

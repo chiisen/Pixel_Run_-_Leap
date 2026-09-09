@@ -43,6 +43,7 @@ class GameScene extends Phaser.Scene {
 
   create() {
     // 目前先以單一場景驗證素材、物理與遊戲狀態可以正常串接。
+    this.createAnimations();
     this.createBackground();
     this.createLevel();
     this.createPlayer();
@@ -94,6 +95,8 @@ class GameScene extends Phaser.Scene {
       this.player.setVelocityX(0);
     }
 
+    this.updatePlayerAnimation();
+
     const jumpPressed = Phaser.Input.Keyboard.JustDown(jump) || this.touchJumpQueued;
     this.touchJumpQueued = false;
 
@@ -124,11 +127,75 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
   }
 
+  createAnimations() {
+    this.anims.create({
+      key: 'mario-walk',
+      frames: ['mario/walk1', 'mario/walk2', 'mario/walk3'].map((frame) => ({
+        key: 'mario',
+        frame,
+      })),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'mario-walk-super',
+      frames: ['mario/walkSuper1', 'mario/walkSuper2', 'mario/walkSuper3'].map((frame) => ({
+        key: 'mario',
+        frame,
+      })),
+      frameRate: 10,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'goomba-walk',
+      frames: ['goomba/walk1', 'goomba/walk2'].map((frame) => ({ key: 'mario', frame })),
+      frameRate: 5,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'coin-spin',
+      frames: ['coin/coin1', 'coin/coin2', 'coin/coin3'].map((frame) => ({
+        key: 'mario',
+        frame,
+      })),
+      frameRate: 8,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'star-spin',
+      frames: ['powerup/star1', 'powerup/star2', 'powerup/star3', 'powerup/star4'].map((frame) => ({
+        key: 'mario',
+        frame,
+      })),
+      frameRate: 10,
+      repeat: -1,
+    });
+  }
+
   createPlayer() {
     this.player = this.physics.add.sprite(96, 100, 'mario', 'mario/stand');
     this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
     this.player.body.setSize(12, 16).setOffset(2, 0);
+  }
+
+  updatePlayerAnimation() {
+    if (!this.player.body.blocked.down) {
+      this.player.anims.stop();
+      this.player.setFrame(this.gameState.power === 'super' ? 'mario/jumpSuper' : 'mario/jump');
+      return;
+    }
+
+    if (this.player.body.velocity.x !== 0) {
+      this.player.anims.play(
+        this.gameState.power === 'super' ? 'mario-walk-super' : 'mario-walk',
+        true,
+      );
+      return;
+    }
+
+    this.player.anims.stop();
+    this.player.setFrame(this.gameState.power === 'super' ? 'mario/standSuper' : 'mario/stand');
   }
 
   createCollectibles() {
@@ -145,7 +212,10 @@ class GameScene extends Phaser.Scene {
         const position = { x: x + 8, y: y - 8 };
 
         if (name === 'coin') {
-          this.coins.create(position.x, position.y, 'mario', 'coin/coin1').setScale(2);
+          this.coins
+            .create(position.x, position.y, 'mario', 'coin/coin1')
+            .setScale(2)
+            .play('coin-spin');
           return;
         }
 
@@ -157,10 +227,13 @@ class GameScene extends Phaser.Scene {
         const powerUp = this.powerUps.create(position.x, position.y, 'mario', frame);
         powerUp.setScale(2);
         powerUp.setData('type', name);
+        if (name === 'star') {
+          powerUp.play('star-spin');
+        }
       });
 
     if (this.coins.countActive(true) === 0) {
-      this.coins.create(300, 150, 'mario', 'coin/coin1').setScale(2);
+      this.coins.create(300, 150, 'mario', 'coin/coin1').setScale(2).play('coin-spin');
     }
 
     if (this.powerUps.countActive(true) === 0) {
@@ -172,6 +245,9 @@ class GameScene extends Phaser.Scene {
         const powerUp = this.powerUps.create(x, y, 'mario', frame);
         powerUp.setScale(2);
         powerUp.setData('type', type);
+        if (type === 'star') {
+          powerUp.play('star-spin');
+        }
       });
     }
   }
@@ -210,6 +286,7 @@ class GameScene extends Phaser.Scene {
     enemyData.forEach(({ x, y, speed }) => {
       const enemy = this.enemies.create(x, y, 'mario', 'goomba/walk1');
       enemy.setScale(2);
+      enemy.play('goomba-walk');
       enemy.setVelocityX(speed);
       enemy.setBounceX(1);
       enemy.setCollideWorldBounds(true);
