@@ -24,6 +24,7 @@
 - 修正玩家踩踏敵人時因 Phaser 碰撞回呼速度已歸零而被誤判為受傷的問題。
 - 補上玩家掉出地圖的死亡判定，生命歸零後會顯示 Game Over。
 - 將 Playwright Phaser 測試限制為單 worker，避免多 WebGL context 造成 GPU stall。
+- 修正 Game Over 音效因終局碰撞回呼重複觸發而連續播放的問題。
 - 建立專案規範檔 `AGENTS.md`、`CLAUDE.md` 與 `GEMINI.md`，三份內容保持同步。
 - 確認使用 Phaser 3 + JavaScript 製作遊戲。
 - 設計單元測試以 Vitest 為主，瀏覽器測試作為 Phaser 整合驗證。

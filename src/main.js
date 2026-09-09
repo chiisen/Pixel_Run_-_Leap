@@ -85,6 +85,7 @@ class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
     this.gameState = createGameState();
+    this.resultShown = false;
   }
 
   create() {
@@ -488,7 +489,7 @@ class GameScene extends Phaser.Scene {
   }
 
   handleEnemyContact(player, enemy) {
-    if (!enemy.active) {
+    if (!enemy.active || this.gameState.status !== 'playing') {
       return;
     }
 
@@ -640,10 +641,16 @@ class GameScene extends Phaser.Scene {
   }
 
   showResultIfFinished() {
+    if (this.resultShown) {
+      return;
+    }
+
     if (this.gameState.status === 'complete') {
+      this.resultShown = true;
       this.resultText.setText('過關！\n按 R 重新開始').setVisible(true);
       this.player.setVelocity(0, 0);
     } else if (this.gameState.status === 'game-over') {
+      this.resultShown = true;
       this.resultText.setText('遊戲結束\n按 R 重新開始').setVisible(true);
       this.playSfx('smb_gameover');
       this.player.setVelocity(0, 0);
