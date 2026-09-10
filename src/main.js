@@ -3,6 +3,12 @@ import Phaser from 'phaser';
 import './styles.css';
 
 import {
+  QUESTION_BLOCK_INDEX,
+  USED_BLOCK_INDEX,
+  buildSpawnTable,
+  resolveSpawnType,
+} from './game/questionBlocks.js';
+import {
   collectCoin,
   collectPowerUp,
   completeLevel,
@@ -180,9 +186,11 @@ class GameScene extends Phaser.Scene {
     );
     this.physics.add.collider(this.enemies, this.worldLayer);
     this.physics.add.collider(this.fireballs, this.worldLayer);
+    this.physics.add.collider(this.spawnedItems, this.worldLayer);
     this.physics.add.collider(this.player, this.enemies, this.handleEnemyContact, null, this);
     this.physics.add.overlap(this.player, this.coins, this.handleCoin, null, this);
     this.physics.add.overlap(this.player, this.powerUps, this.handlePowerUp, null, this);
+    this.physics.add.overlap(this.player, this.spawnedItems, this.handlePowerUp, null, this);
     this.physics.add.overlap(this.fireballs, this.enemies, this.handleFireballEnemy, null, this);
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -265,6 +273,13 @@ class GameScene extends Phaser.Scene {
       this.handlePlayerDeath();
       return;
     }
+
+    const pitY = this.levelOffsetY + this.levelMap.heightInPixels + 64;
+    this.spawnedItems.getChildren().forEach((item) => {
+      if (item.y > pitY) {
+        item.destroy();
+      }
+    });
 
     if (left.isDown || a.isDown || this.touchState.left) {
       this.player.setVelocityX(-140);
@@ -447,6 +462,9 @@ class GameScene extends Phaser.Scene {
     const modifiers = this.levelMap.getObjectLayer('modifiers')?.objects ?? [];
     this.coins = this.physics.add.staticGroup();
     this.powerUps = this.physics.add.staticGroup();
+    this.spawnedItems = this.physics.add.group();
+    // 有相鄰問號磚的標記改由頂磚生成，不再靜態擺放；無磚標記維持舊擺放。
+    this.spawnTable = buildSpawnTable(this.findBlockSpawns(modifiers));
 
     modifiers
       .filter(
@@ -454,6 +472,10 @@ class GameScene extends Phaser.Scene {
           type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
       )
       .forEach(({ name, x, y }) => {
+        if (this.findQuestionBlock(x, y)) {
+          return;
+        }
+
         const position = { x: x + 8, y: y - 8 + this.levelOffsetY };
 
         if (name === 'coin') {
@@ -500,6 +522,36 @@ class GameScene extends Phaser.Scene {
         }
       });
     }
+  }
+
+  findQuestionBlock(x, y) {
+    const tileX = Math.floor(x / 16);
+    const tileY = Math.floor(y / 16);
+
+    // 標記座落在磚格邊界上，上下各找一格內的問號磚。
+    for (const candidateY of [tileY - 1, tileY, tileY + 1]) {
+      const tile = this.levelMap.getTileAt(tileX, candidateY, false, 'world');
+
+      if (tile?.index === QUESTION_BLOCK_INDEX) {
+        return { tileX, tileY: candidateY };
+      }
+    }
+
+    return null;
+  }
+
+  findBlockSpawns(modifiers) {
+    return modifiers
+      .filter(
+        ({ name, type }) =>
+          type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
+      )
+      .map(({ name, x, y }) => {
+        const block = this.findQuestionBlock(x, y);
+
+        return block ? { name, ...block } : null;
+      })
+      .filter(Boolean);
   }
 
   handleCoin(player, coin) {
@@ -696,12 +748,110 @@ class GameScene extends Phaser.Scene {
   }
 
   handlePlayerTileCollision(player, tile) {
-    if (!tile?.properties?.callback || !player.body.touching.up) {
+    // 注意：Phaser 磚塊分離只設定 blocked 而不設定 touching，
+    // 頭頂磚塊必須用 blocked.up 判斷，touching.up 永遠是 false。
+    if (!tile || !player.body.blocked.up) {
       return;
     }
 
-    this.worldLayer.removeTileAt(tile.x, tile.y);
-    this.playSfx('smb_breakblock');
+    // 用過的磚再頂只有碰撞音效，不再觸發。
+    if (tile.index === USED_BLOCK_INDEX) {
+      this.playSfx('smb_bump');
+      return;
+    }
+
+    if (tile.properties?.callback !== 'questionMark') {
+      if (!tile.properties?.callback) {
+        return;
+      }
+
+      this.worldLayer.removeTileAt(tile.x, tile.y);
+      this.playSfx('smb_breakblock');
+      return;
+    }
+
+    this.hitQuestionBlock(tile);
+  }
+
+  hitQuestionBlock(tile) {
+    this.worldLayer.putTileAt(USED_BLOCK_INDEX, tile.x, tile.y);
+    this.playSfx('smb_bump');
+
+    const type = resolveSpawnType(this.spawnTable, tile.x, tile.y);
+
+    if (type === 'coin') {
+      this.spawnCoinPop(tile);
+      return;
+    }
+
+    this.spawnItemFromBlock(tile, type);
+  }
+
+  spawnCoinPop(tile) {
+    const x = tile.pixelX + 8;
+    const y = tile.pixelY + this.levelOffsetY;
+
+    this.gameState = collectCoin(this.gameState);
+    this.playSfx('smb_coin');
+    this.updateHud();
+
+    const coin = this.add.image(x, y - 8, 'mario', 'coin/coin1').setScale(2);
+    this.tweens.add({
+      duration: 180,
+      onComplete: () => coin.destroy(),
+      targets: coin,
+      y: y - 56,
+      yoyo: true,
+    });
+  }
+
+  spawnItemFromBlock(tile, type) {
+    const x = tile.pixelX + 8;
+    const topY = tile.pixelY + this.levelOffsetY;
+    const frame = {
+      '1up': 'powerup/1up',
+      flower: 'powerup/flower1',
+      mushroom: 'powerup/super',
+      star: 'powerup/star1',
+    }[type];
+    const item = this.spawnedItems.create(x, topY - 8, 'mario', frame);
+
+    item.setScale(2);
+    item.setData('type', type);
+    item.body.setSize(14, 14);
+    item.body.setAllowGravity(false);
+    item.setVelocity(0, 0);
+    if (type === 'star') {
+      item.play('star-spin');
+    }
+    this.playSfx('smb_powerup_appears');
+    // 先升出磚面再啟用移動，升起過程保持無重力靜止。
+    this.tweens.add({
+      duration: 260,
+      onComplete: () => this.releaseSpawnedItem(item, type),
+      targets: item,
+      y: topY - 32,
+    });
+  }
+
+  releaseSpawnedItem(item, type) {
+    if (!item.active) {
+      return;
+    }
+
+    if (type === 'flower') {
+      item.body.setImmovable(true);
+      return;
+    }
+
+    item.body.setAllowGravity(true);
+    item.setVelocityX(45 * (item.x < this.player.x ? -1 : 1));
+    if (type === 'star') {
+      item.setBounce(0.7);
+      item.setVelocityY(-120);
+    } else {
+      item.setBounceX(1);
+    }
   }
 
   tryEnterPipe() {
