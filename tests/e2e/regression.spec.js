@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 
 test('碰到旗杆杆身可過關', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   // 旗杆柱 x=198（中心 3176），杆身 y 範圍 242～418。
@@ -20,7 +20,7 @@ test('碰到旗杆杆身可過關', async ({ page }) => {
 
 test('頂無標記問號磚會冒出金幣', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
 
@@ -38,7 +38,7 @@ test('頂無標記問號磚會冒出金幣', async ({ page }) => {
 
 test('頂蘑菇磚追到蘑菇會變大', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
 
@@ -65,7 +65,7 @@ test('頂蘑菇磚追到蘑菇會變大', async ({ page }) => {
 
 test('頂星星磚追到星星會無敵', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
 
@@ -95,7 +95,7 @@ test('頂星星磚追到星星會無敵', async ({ page }) => {
 
 test('高台敵人到邊緣回頭不掉落', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   // getEnemies()[4] 出生高台（y≈274）；懸崖偵測應讓牠留守，不掉到地面 y=402。
@@ -108,7 +108,7 @@ test('高台敵人到邊緣回頭不掉落', async ({ page }) => {
 
 test('開局無靜態道具裸露', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.waitForTimeout(500);
 
@@ -122,7 +122,7 @@ test('開局無靜態道具裸露', async ({ page }) => {
 test('頂出的蘑菇15秒未吃會消失', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
 

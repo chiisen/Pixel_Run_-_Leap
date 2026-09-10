@@ -13,7 +13,7 @@ test('loads the Pixel Run & Leap shell without browser errors', async ({ page })
 
   await expect(page).toHaveTitle('Pixel Run & Leap');
   await expect(page.locator('canvas')).toBeVisible();
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   expect(errors).toEqual([]);
 });
@@ -29,7 +29,7 @@ test('shows touch controls on a mobile viewport', async ({ page }) => {
 
 test('exposes deterministic debug state in test mode', async ({ page }) => {
   await page.goto('/?debug=1&test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const state = await page.evaluate(() => window.__pixelRunLeap.getState());
@@ -39,7 +39,7 @@ test('exposes deterministic debug state in test mode', async ({ page }) => {
 test('手機觸控按鈕可讓玩家向右移動', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const startX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
@@ -53,7 +53,7 @@ test('手機觸控按鈕可讓玩家向右移動', async ({ page }) => {
 
 test('按下 P 鍵之後物理停止並顯示暫停文字', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const movingStart = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
@@ -80,7 +80,7 @@ test('按下 P 鍵之後物理停止並顯示暫停文字', async ({ page }) => 
 
 test('moves the player with keyboard input', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const startX = await page.evaluate(() => window.__pixelRunLeap.getPlayer().x);
@@ -94,7 +94,7 @@ test('moves the player with keyboard input', async ({ page }) => {
 
 test('物理世界寬度涵蓋完整關卡', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const bounds = await page.evaluate(() => window.__pixelRunLeap.getWorldBounds());
@@ -103,7 +103,7 @@ test('物理世界寬度涵蓋完整關卡', async ({ page }) => {
 
 test('從地圖載入 Goomba 與龜型敵人', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const enemyTypes = await page.evaluate(() => [
@@ -114,7 +114,7 @@ test('從地圖載入 Goomba 與龜型敵人', async ({ page }) => {
 
 test('玩家從敵人上方落下時可以踩踏敵人', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   const enemy = await page.evaluate(() => window.__pixelRunLeap.getEnemies()[0]);
@@ -129,7 +129,7 @@ test('玩家從敵人上方落下時可以踩踏敵人', async ({ page }) => {
 
 test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -143,7 +143,7 @@ test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
 
 test('可以從標題畫面關閉背景音樂', async ({ page }) => {
   await page.goto('/?test=1');
-  await expect(page.locator('#start-game')).toBeVisible();
+  await expect(page.locator('canvas')).toBeVisible();
   await page.evaluate(() => {
     window.__pixelRunLeapAudio.musicEnabled = false;
   });
@@ -153,7 +153,7 @@ test('可以從標題畫面關閉背景音樂', async ({ page }) => {
 
 test('Game Over 按 R 後重設狀態並恢復移動', async ({ page }) => {
   await page.goto('/?test=1');
-  await page.locator('#start-game').click();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {

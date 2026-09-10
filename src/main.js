@@ -52,9 +52,6 @@ class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    const startButton = document.querySelector('#start-game');
-    startButton.hidden = false;
-
     const audioState = TitleScene.getAudioState();
     this.musicEnabled = audioState.musicEnabled;
     this.sfxEnabled = audioState.sfxEnabled;
@@ -65,6 +62,7 @@ class TitleScene extends Phaser.Scene {
         color: '#ffffff',
         fontFamily: 'monospace',
         fontSize: '42px',
+        resolution: 2,
       })
       .setOrigin(0.5);
 
@@ -75,6 +73,7 @@ class TitleScene extends Phaser.Scene {
         fontSize: '16px',
         backgroundColor: '#3a4a8c',
         padding: { x: 10, y: 6 },
+        resolution: 2,
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
@@ -86,6 +85,7 @@ class TitleScene extends Phaser.Scene {
         fontSize: '16px',
         backgroundColor: '#3a4a8c',
         padding: { x: 10, y: 6 },
+        resolution: 2,
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
@@ -101,12 +101,12 @@ class TitleScene extends Phaser.Scene {
         fontFamily: 'sans-serif',
         fontSize: '24px',
         padding: { x: 24, y: 14 },
+        resolution: 2,
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.startGame());
 
-    startButton.addEventListener('click', () => this.startGame(), { once: true });
     this.input.keyboard.once('keydown-SPACE', () => this.startGame());
     this.input.keyboard.once('keydown-ENTER', () => this.startGame());
   }
@@ -116,7 +116,6 @@ class TitleScene extends Phaser.Scene {
       return;
     }
 
-    document.querySelector('#start-game').hidden = true;
     this.scene.start('GameScene');
   }
 
@@ -715,8 +714,10 @@ class GameScene extends Phaser.Scene {
           frame: name === 'turtle' ? 'turtle/turtle0' : 'goomba/walk1',
           name,
           speed: name === 'turtle' ? -25 : -35,
+          // Tiled y 是物件底部，中心需上移半身高：goomba 16px、烏龜 24px。
+          // 烏龜用 -16 會一出生就半埋進地板，物理擠壓後整隻穿過地面。
           x,
-          y: y - 16 + this.levelOffsetY,
+          y: y - (name === 'turtle' ? 24 : 16) + this.levelOffsetY,
         }))
       : [{ frame: 'goomba/walk1', name: 'goomba', speed: -35, x: 470, y: 180 + this.levelOffsetY }];
 
@@ -728,7 +729,12 @@ class GameScene extends Phaser.Scene {
       enemy.setVelocityX(speed);
       enemy.setBounceX(1);
       enemy.setCollideWorldBounds(true);
-      enemy.body.setSize(14, 14).setOffset(1, 2);
+      // 烏龜貼圖 16x24，碰撞框需 14x22 腳底對齊；沿用 goomba 的 14x14 會腳懸空埋進地板。
+      if (name === 'turtle') {
+        enemy.body.setSize(14, 22).setOffset(1, 2);
+      } else {
+        enemy.body.setSize(14, 14).setOffset(1, 2);
+      }
     });
   }
 
@@ -773,6 +779,7 @@ class GameScene extends Phaser.Scene {
         color: '#ffffff',
         fontFamily: 'monospace',
         fontSize: '16px',
+        resolution: 2,
         stroke: '#000000',
         strokeThickness: 4,
         wordWrap: { width: GAME_WIDTH - 32 },
@@ -787,6 +794,7 @@ class GameScene extends Phaser.Scene {
         align: 'center',
         backgroundColor: '#101a3acc',
         padding: { x: 18, y: 12 },
+        resolution: 2,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -799,6 +807,7 @@ class GameScene extends Phaser.Scene {
         align: 'center',
         backgroundColor: '#101a3acc',
         padding: { x: 18, y: 12 },
+        resolution: 2,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -816,6 +825,7 @@ class GameScene extends Phaser.Scene {
         color: '#9ff7c8',
         fontFamily: 'monospace',
         fontSize: '12px',
+        resolution: 2,
         stroke: '#000000',
         strokeThickness: 3,
       })
@@ -1233,7 +1243,6 @@ class GameScene extends Phaser.Scene {
 
   returnToTitle() {
     if (this.gameState.status !== 'playing') {
-      document.querySelector('#start-game').hidden = true;
       this.scene.start('TitleScene');
     }
   }
