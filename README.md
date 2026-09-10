@@ -1,7 +1,6 @@
 # Pixel Run & Leap
 
-私人本機使用的 HTML5 2D 平台遊戲，使用 Phaser 3 與 JavaScript 製作，參考
-[`ffx0s/mario-html5`](https://github.com/ffx0s/mario-html5) 的遊戲內容與素材。
+私人本機使用的 HTML5 2D 平台遊戲，使用 Phaser 3 與 JavaScript 製作。
 
 ![demo](./images/demo.png)
 
