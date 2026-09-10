@@ -51,6 +51,13 @@ export function togglePause(state) {
   return { ...state, paused: !state.paused };
 }
 
+// 受傷先掉能力：火焰→超級→小型，不扣生命；小型維持原狀，由場景走死亡流程。
+export function losePower(state) {
+  const downgrade = { fire: 'super', small: 'small', super: 'small' };
+
+  return { ...state, power: downgrade[state.power] ?? 'small' };
+}
+
 // 生命歸零才進入 Game Over，受傷但仍有生命時維持目前遊戲狀態。
 export function damagePlayer(state) {
   const lives = Math.max(0, state.lives - 1);

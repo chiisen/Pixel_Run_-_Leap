@@ -74,7 +74,8 @@ canvas {
 }
 
 #touch-left,
-#touch-right {
+#touch-right,
+#touch-down {
   min-width: 4.5rem;
 }
 

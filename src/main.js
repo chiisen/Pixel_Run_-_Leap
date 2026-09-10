@@ -16,12 +16,15 @@ import {
   createGameState,
   damagePlayer,
   defeatEnemy,
+  losePower,
   tickTimer,
   togglePause,
 } from './game/gameState.js';
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 450;
+// 受傷縮小後的無敵閃爍時間，避免同一隻怪連續撞兩幀直接致死。
+const HURT_COOLDOWN_MS = 2000;
 
 class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -153,6 +156,8 @@ class GameScene extends Phaser.Scene {
     this.gameState = createGameState();
     this.resultShown = false;
     this.audioStarted = false;
+    this.hurtCooldownUntil = 0;
+    this.hurtBlinkEvent = null;
     this.physics.world.isPaused = false;
     const audioState = (window.__pixelRunLeapAudio ??= {
       musicEnabled: true,
@@ -232,12 +237,16 @@ class GameScene extends Phaser.Scene {
             touching: { ...this.player.body.touching },
             velocityY: this.player.body.velocity.y,
           },
+          crouching: this.isCrouching,
           x: this.player.x,
           y: this.player.y,
         }),
         getState: () => ({ ...this.gameState }),
         getItems: () => ({
           coins: this.coins.getChildren().map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
+          fireballs: this.fireballs
+            .getChildren()
+            .map((f) => ({ x: Math.round(f.x), y: Math.round(f.y) })),
           powerUps: this.powerUps
             .getChildren()
             .map((p) => ({ type: p.getData('type'), x: Math.round(p.x), y: Math.round(p.y) })),
@@ -279,6 +288,18 @@ class GameScene extends Phaser.Scene {
       this.tryEnterPipe();
     }
 
+    const downHeld = down.isDown || this.touchState.down;
+    const onGround = this.player.body.blocked.down;
+
+    // 蹲下只在地面成立；走下平台騰空時自動站起，避免空中卡著蹲姿。
+    if (this.isCrouching && !onGround) {
+      this.setCrouching(false);
+    } else if (downHeld && onGround && !this.isCrouching) {
+      this.setCrouching(true);
+    } else if (this.isCrouching && !downHeld) {
+      this.setCrouching(false);
+    }
+
     if (this.player.y > this.levelOffsetY + this.levelMap.heightInPixels + 64) {
       this.handlePlayerDeath();
       return;
@@ -294,7 +315,9 @@ class GameScene extends Phaser.Scene {
     });
     this.updateEnemies();
 
-    if (left.isDown || a.isDown || this.touchState.left) {
+    if (this.isCrouching) {
+      this.player.setVelocityX(0);
+    } else if (left.isDown || a.isDown || this.touchState.left) {
       this.player.setVelocityX(-140);
       this.player.setFlipX(true);
     } else if (right.isDown || d.isDown || this.touchState.right) {
@@ -309,6 +332,11 @@ class GameScene extends Phaser.Scene {
 
     const jumpPressed = Phaser.Input.Keyboard.JustDown(jump) || this.touchJumpQueued;
     this.touchJumpQueued = false;
+
+    // 蹲著跳先站起來再起跳，共用同一套 blocked.down 地面判定。
+    if (jumpPressed && this.isCrouching) {
+      this.setCrouching(false);
+    }
 
     if (jumpPressed && this.player.body.blocked.down) {
       this.player.setVelocityY(-300);
@@ -435,10 +463,57 @@ class GameScene extends Phaser.Scene {
     );
     this.player.setScale(2);
     this.player.setCollideWorldBounds(true);
-    this.player.body.setSize(12, 16).setOffset(2, 0);
+    this.isCrouching = false;
+    this.updatePlayerBody('small', false);
+  }
+
+  // 小型 16x16、超級/火焰 16x32：變身必須同步放大碰撞框，
+  // 否則 body 只有上半身高度，腳會陷入地板、blocked.down 永遠對不準。
+  // 蹲下縮小高度但腳底對齊（small 12x12、super/fire 12x20），不需移動 y。
+  updatePlayerBody(power, crouching = false) {
+    if (crouching) {
+      if (power === 'super' || power === 'fire') {
+        this.player.body.setSize(12, 20).setOffset(2, 12);
+      } else {
+        this.player.body.setSize(12, 12).setOffset(2, 4);
+      }
+      return;
+    }
+
+    if (power === 'super' || power === 'fire') {
+      this.player.body.setSize(12, 30).setOffset(2, 2);
+    } else {
+      this.player.body.setSize(12, 16).setOffset(2, 0);
+    }
+  }
+
+  // 蹲下切換統一經此函式，確保動畫與碰撞框一致；不滿足地面條件由 update() 把關。
+  setCrouching(on) {
+    if (this.isCrouching === on) {
+      return;
+    }
+
+    this.isCrouching = on;
+    this.player.anims.stop();
+    this.updatePlayerBody(this.gameState.power, on);
+
+    if (on) {
+      this.player.setVelocityX(0);
+    }
   }
 
   updatePlayerAnimation() {
+    if (this.isCrouching) {
+      this.player.anims.stop();
+      const bendFrame = {
+        fire: 'mario/bendFire',
+        small: 'mario/bend',
+        super: 'mario/bendSuper',
+      }[this.gameState.power];
+      this.player.setFrame(bendFrame);
+      return;
+    }
+
     if (!this.player.body.blocked.down) {
       this.player.anims.stop();
       const jumpFrame = {
@@ -777,12 +852,13 @@ class GameScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-T', this.returnToTitle, this);
     this.input.keyboard.on('keydown-P', this.togglePause, this);
 
-    this.touchState = { left: false, right: false };
+    this.touchState = { down: false, left: false, right: false };
     this.touchJumpQueued = false;
     this.touchFireQueued = false;
     this.domAbortController = new AbortController();
     this.bindTouchButton('touch-left', 'left');
     this.bindTouchButton('touch-right', 'right');
+    this.bindTouchButton('touch-down', 'down');
     document.querySelector('#touch-fire').addEventListener(
       'pointerdown',
       (event) => {
@@ -819,6 +895,11 @@ class GameScene extends Phaser.Scene {
       player.setVelocityY(-220);
       this.playSfx('smb_stomp');
       this.time.delayedCall(300, () => enemy.destroy());
+    } else if (this.time.now < this.hurtCooldownUntil) {
+      // 受傷無敵閃爍中，直接穿過敵人。
+      return;
+    } else if (this.gameState.power === 'super' || this.gameState.power === 'fire') {
+      this.shrinkPlayerFromHit();
     } else {
       // 非踩踏碰撞使用與掉出地圖相同的死亡流程。
       this.handlePlayerDeath();
@@ -826,6 +907,34 @@ class GameScene extends Phaser.Scene {
 
     this.updateHud();
     this.showResultIfFinished();
+  }
+
+  // 變大狀態受傷只掉能力不扣命，並給 2 秒無敵閃爍，
+  // 否則同一隻怪下一幀就會把縮小後的小型主角直接撞死。
+  shrinkPlayerFromHit() {
+    const wasBig = this.gameState.power === 'super' || this.gameState.power === 'fire';
+    this.gameState = losePower(this.gameState);
+    this.playSfx('smb_pipe');
+
+    // 縮小後腳底對齊：站立時下移 16px，蹲著時碰撞框本來就貼腳不需移動。
+    if (wasBig && !this.isCrouching) {
+      this.player.y += 16;
+    }
+    this.updatePlayerBody(this.gameState.power, this.isCrouching);
+
+    this.hurtCooldownUntil = this.time.now + HURT_COOLDOWN_MS;
+    this.hurtBlinkEvent?.remove();
+    this.player.setAlpha(1);
+    this.hurtBlinkEvent = this.time.addEvent({
+      callback: () => this.player.setAlpha(this.player.alpha === 1 ? 0.25 : 1),
+      delay: 100,
+      loop: true,
+    });
+    this.time.delayedCall(HURT_COOLDOWN_MS, () => {
+      this.hurtBlinkEvent?.remove();
+      this.hurtBlinkEvent = null;
+      this.player.setAlpha(1);
+    });
   }
 
   handlePlayerTileCollision(player, tile) {
@@ -964,6 +1073,9 @@ class GameScene extends Phaser.Scene {
     }
 
     this.gameState = damagePlayer(this.gameState);
+    this.hurtBlinkEvent?.remove();
+    this.hurtBlinkEvent = null;
+    this.player.setAlpha(1);
     this.playSfx('smb_mariodie');
 
     if (this.gameState.status === 'game-over') {
@@ -984,16 +1096,27 @@ class GameScene extends Phaser.Scene {
     }
 
     const type = powerUp.getData('type');
+    const wasSmall = this.gameState.power === 'small';
     this.gameState = collectPowerUp(this.gameState, type);
     powerUp.destroy();
     this.playSfx(type === '1up' ? 'smb_1-up' : 'smb_powerup');
 
     if (type === 'mushroom') {
       player.setFrame('mario/standSuper');
+      // 長高 16 紋素（顯示 32px），腳底對齊需上移 16px，
+      // 再放大碰撞框，否則下半身陷入地板。
+      if (wasSmall) {
+        player.y -= 16;
+      }
+      this.updatePlayerBody('super', this.isCrouching);
     }
 
     if (type === 'flower') {
       player.setFrame('mario/standFire');
+      if (wasSmall) {
+        player.y -= 16;
+      }
+      this.updatePlayerBody('fire', this.isCrouching);
     }
 
     if (type === 'star') {
@@ -1020,9 +1143,10 @@ class GameScene extends Phaser.Scene {
       'mario',
       'fire/fly1',
     );
-    fireball.setVelocityX(direction * 240);
+    // 火球往斜下方丟出，靠重力下墜、觸地滿彈性跳起，沿地面上下彈跳前進。
+    fireball.setVelocity(direction * 240, 160);
     fireball.setBounce(1, 1);
-    fireball.body.setAllowGravity(false);
+    fireball.body.setAllowGravity(true);
     fireball.setCollideWorldBounds(true);
     this.fireCooldown = 20;
     this.playSfx('smb_fireball');

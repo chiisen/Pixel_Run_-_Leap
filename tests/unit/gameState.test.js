@@ -7,6 +7,7 @@ import {
   damagePlayer,
   defeatEnemy,
   collectPowerUp,
+  losePower,
   tickTimer,
 } from '../../src/game/gameState.js';
 
@@ -74,6 +75,24 @@ describe('遊戲狀態', () => {
     const state = createGameState({ lives: 1 });
 
     expect(damagePlayer(state)).toMatchObject({ lives: 0, status: 'game-over' });
+  });
+
+  it('超級受傷時縮小為小型且不扣生命', () => {
+    const state = losePower(createGameState({ lives: 3, power: 'super' }));
+
+    expect(state).toMatchObject({ lives: 3, power: 'small' });
+  });
+
+  it('火焰受傷時降為超級且不扣生命', () => {
+    const state = losePower(createGameState({ lives: 3, power: 'fire' }));
+
+    expect(state).toMatchObject({ lives: 3, power: 'super' });
+  });
+
+  it('小型受傷時維持小型，由場景走死亡流程', () => {
+    const state = losePower(createGameState({ lives: 3, power: 'small' }));
+
+    expect(state).toMatchObject({ lives: 3, power: 'small' });
   });
 
   it('倒數時間歸零時結束遊戲', () => {
