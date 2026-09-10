@@ -3,6 +3,8 @@
 export const QUESTION_BLOCK_INDEX = 41;
 export const USED_BLOCK_INDEX = 40;
 export const DEFAULT_SPAWN_TYPE = 'coin';
+// 頂出後未拾取的漫遊道具存活上限，避免永久遊蕩堆積。
+export const ITEM_LIFETIME_MS = 15000;
 
 const KNOWN_SPAWN_TYPES = ['coin', 'flower', 'mushroom', 'star', '1up'];
 

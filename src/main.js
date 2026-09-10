@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import './styles.css';
 
 import {
+  ITEM_LIFETIME_MS,
   QUESTION_BLOCK_INDEX,
   USED_BLOCK_INDEX,
   buildSpawnTable,
@@ -235,6 +236,15 @@ class GameScene extends Phaser.Scene {
           y: this.player.y,
         }),
         getState: () => ({ ...this.gameState }),
+        getItems: () => ({
+          coins: this.coins.getChildren().map((c) => ({ x: Math.round(c.x), y: Math.round(c.y) })),
+          powerUps: this.powerUps
+            .getChildren()
+            .map((p) => ({ type: p.getData('type'), x: Math.round(p.x), y: Math.round(p.y) })),
+          spawned: this.spawnedItems
+            .getChildren()
+            .map((p) => ({ type: p.getData('type'), x: Math.round(p.x), y: Math.round(p.y) })),
+        }),
         getWorldBounds: () => ({
           height: this.physics.world.bounds.height,
           width: this.physics.world.bounds.width,
@@ -276,7 +286,9 @@ class GameScene extends Phaser.Scene {
 
     const pitY = this.levelOffsetY + this.levelMap.heightInPixels + 64;
     this.spawnedItems.getChildren().forEach((item) => {
-      if (item.y > pitY) {
+      const age = this.time.now - (item.getData('spawnedAt') ?? this.time.now);
+
+      if (item.y > pitY || age > ITEM_LIFETIME_MS) {
         item.destroy();
       }
     });
@@ -464,42 +476,13 @@ class GameScene extends Phaser.Scene {
     this.coins = this.physics.add.staticGroup();
     this.powerUps = this.physics.add.staticGroup();
     this.spawnedItems = this.physics.add.group();
-    // 有相鄰問號磚的標記改由頂磚生成，不再靜態擺放；無磚標記維持舊擺放。
-    this.spawnTable = buildSpawnTable(this.findBlockSpawns(modifiers));
+    // 有相鄰問號磚的標記改由頂磚生成，不再靜態擺放；無磚可掛才靜態擺放。
+    const { entries, statics } = this.findBlockSpawns(modifiers);
+    this.spawnTable = buildSpawnTable(entries);
 
-    modifiers
-      .filter(
-        ({ name, type }) =>
-          type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
-      )
-      .forEach(({ name, x, y }) => {
-        if (this.findQuestionBlock(x, y)) {
-          return;
-        }
-
-        const position = { x: x + 8, y: y - 8 + this.levelOffsetY };
-
-        if (name === 'coin') {
-          this.coins
-            .create(position.x, position.y, 'mario', 'coin/coin1')
-            .setScale(2)
-            .play('coin-spin');
-          return;
-        }
-
-        const frame = {
-          '1up': 'powerup/1up',
-          flower: 'powerup/flower1',
-          mushroom: 'powerup/super',
-          star: 'powerup/star1',
-        }[name];
-        const powerUp = this.powerUps.create(position.x, position.y, 'mario', frame);
-        powerUp.setScale(2);
-        powerUp.setData('type', name);
-        if (name === 'star') {
-          powerUp.play('star-spin');
-        }
-      });
+    statics.forEach(({ name, x, y }) => {
+      this.placeStaticPowerUp(name, x, y);
+    });
 
     if (this.coins.countActive(true) === 0) {
       this.coins
@@ -509,11 +492,14 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.powerUps.countActive(true) === 0) {
+      // 該種類已有地圖標記（走頂出生成）就不再靜態擺放，避免裸露；
+      // 目前只有花朵無標記，保留一朵靜態作為唯一來源。
+      const marked = new Set(entries.map(({ name }) => name));
       const fallback = [
         { type: 'flower', frame: 'powerup/flower1', x: 620, y: 150 + this.levelOffsetY },
         { type: 'mushroom', frame: 'powerup/super', x: 420, y: 150 + this.levelOffsetY },
         { type: 'star', frame: 'powerup/star1', x: 820, y: 150 + this.levelOffsetY },
-      ];
+      ].filter(({ type }) => !marked.has(type));
       fallback.forEach(({ type, frame, x, y }) => {
         const powerUp = this.powerUps.create(x, y, 'mario', frame);
         powerUp.setScale(2);
@@ -522,6 +508,31 @@ class GameScene extends Phaser.Scene {
           powerUp.play('star-spin');
         }
       });
+    }
+  }
+
+  placeStaticPowerUp(name, x, y) {
+    const position = { x: x + 8, y: y - 8 + this.levelOffsetY };
+
+    if (name === 'coin') {
+      this.coins
+        .create(position.x, position.y, 'mario', 'coin/coin1')
+        .setScale(2)
+        .play('coin-spin');
+      return;
+    }
+
+    const frame = {
+      '1up': 'powerup/1up',
+      flower: 'powerup/flower1',
+      mushroom: 'powerup/super',
+      star: 'powerup/star1',
+    }[name];
+    const powerUp = this.powerUps.create(position.x, position.y, 'mario', frame);
+    powerUp.setScale(2);
+    powerUp.setData('type', name);
+    if (name === 'star') {
+      powerUp.play('star-spin');
     }
   }
 
@@ -542,17 +553,55 @@ class GameScene extends Phaser.Scene {
   }
 
   findBlockSpawns(modifiers) {
-    return modifiers
-      .filter(
-        ({ name, type }) =>
-          type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
-      )
-      .map(({ name, x, y }) => {
-        const block = this.findQuestionBlock(x, y);
+    const markers = modifiers.filter(
+      ({ name, type }) =>
+        type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
+    );
+    const entries = [];
+    const usedKeys = new Set();
+    const statics = [];
 
-        return block ? { name, ...block } : null;
-      })
-      .filter(Boolean);
+    markers.forEach(({ name, x, y }) => {
+      const block = this.findQuestionBlock(x, y);
+
+      if (block) {
+        entries.push({ name, ...block });
+        usedKeys.add(`${block.tileX},${block.tileY}`);
+        return;
+      }
+
+      // 無相鄰問號磚的標記（如懸空 1UP）藏進最近的空閒問號磚；
+      // 沒有空閒磚才回退靜態擺放。
+      const spare = this.findSpareQuestionBlock(x, usedKeys);
+
+      if (spare) {
+        entries.push({ name, ...spare });
+        usedKeys.add(`${spare.tileX},${spare.tileY}`);
+      } else {
+        statics.push({ name, x, y });
+      }
+    });
+
+    return { entries, statics };
+  }
+
+  findSpareQuestionBlock(markerX, usedKeys) {
+    const spares = this.worldLayer.filterTiles(
+      (tile) => tile?.index === QUESTION_BLOCK_INDEX && !usedKeys.has(`${tile.x},${tile.y}`),
+      this,
+      0,
+      0,
+      this.levelMap.width,
+      this.levelMap.height,
+    );
+
+    if (spares.length === 0) {
+      return null;
+    }
+
+    spares.sort((a, b) => Math.abs(a.pixelX + 8 - markerX) - Math.abs(b.pixelX + 8 - markerX));
+
+    return { tileX: spares[0].x, tileY: spares[0].y };
   }
 
   handleCoin(player, coin) {
@@ -610,26 +659,31 @@ class GameScene extends Phaser.Scene {
 
   updateEnemies() {
     // 懸崖偵測：落地行走時前方無磚就轉向，避免直直走下高台。
-    // 地面層全連通不受影響，只改變高台邊緣行為。
-    this.enemies.getChildren().forEach((enemy) => {
-      if (!enemy.active || !enemy.body.blocked.down) {
+    // 地面層全連通不受影響，只改變高台邊緣行為；頂出道具共用同一規則。
+    this.applyLedgeTurn(this.enemies);
+    this.applyLedgeTurn(this.spawnedItems);
+  }
+
+  applyLedgeTurn(group) {
+    group.getChildren().forEach((body) => {
+      if (!body.active || !body.body.blocked.down) {
         return;
       }
 
-      const direction = Math.sign(enemy.body.velocity.x);
+      const direction = Math.sign(body.body.velocity.x);
 
       if (direction === 0) {
         return;
       }
 
       const ahead = this.worldLayer.getTileAtWorldXY(
-        enemy.x + direction * (enemy.body.halfWidth + 3),
-        enemy.body.bottom + 4,
+        body.x + direction * (body.body.halfWidth + 3),
+        body.body.bottom + 4,
         false,
       );
 
       if (!ahead?.collides) {
-        enemy.setVelocityX(-enemy.body.velocity.x);
+        body.setVelocityX(-body.body.velocity.x);
       }
     });
   }
@@ -845,6 +899,7 @@ class GameScene extends Phaser.Scene {
 
     item.setScale(2);
     item.setData('type', type);
+    item.setData('spawnedAt', this.time.now);
     item.body.setSize(14, 14);
     item.body.setAllowGravity(false);
     item.setVelocity(0, 0);
