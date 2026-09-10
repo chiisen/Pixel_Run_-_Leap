@@ -280,6 +280,7 @@ class GameScene extends Phaser.Scene {
         item.destroy();
       }
     });
+    this.updateEnemies();
 
     if (left.isDown || a.isDown || this.touchState.left) {
       this.player.setVelocityX(-140);
@@ -604,6 +605,32 @@ class GameScene extends Phaser.Scene {
       enemy.setBounceX(1);
       enemy.setCollideWorldBounds(true);
       enemy.body.setSize(14, 14).setOffset(1, 2);
+    });
+  }
+
+  updateEnemies() {
+    // 懸崖偵測：落地行走時前方無磚就轉向，避免直直走下高台。
+    // 地面層全連通不受影響，只改變高台邊緣行為。
+    this.enemies.getChildren().forEach((enemy) => {
+      if (!enemy.active || !enemy.body.blocked.down) {
+        return;
+      }
+
+      const direction = Math.sign(enemy.body.velocity.x);
+
+      if (direction === 0) {
+        return;
+      }
+
+      const ahead = this.worldLayer.getTileAtWorldXY(
+        enemy.x + direction * (enemy.body.halfWidth + 3),
+        enemy.body.bottom + 4,
+        false,
+      );
+
+      if (!ahead?.collides) {
+        enemy.setVelocityX(-enemy.body.velocity.x);
+      }
     });
   }
 
