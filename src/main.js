@@ -514,12 +514,16 @@ class GameScene extends Phaser.Scene {
   }
 
   createGoal() {
-    const endPoint = this.worldLayer.findByIndex(5);
-    const x = endPoint?.pixelX ?? 3700;
-    const y = (endPoint?.pixelY ?? 160) + this.levelOffsetY;
-
-    this.goal = this.physics.add.staticSprite(x, y, 'mario', 'flag');
-    this.goal.setScale(2);
+    const endTile = this.worldLayer.findByIndex(5);
+    const poleCenterX = (endTile?.pixelX ?? 3700) + 8;
+    const poleTopY = (endTile?.pixelY ?? 160) + this.levelOffsetY;
+    // 旗幟本體只有 16x16，放在杆頂當裝飾；真正觸發過關的是覆蓋整根旗杆的靜態區域，
+    // 否則玩家在地面碰到杆身時永遠碰不到杆頂的小圖。
+    this.add.image(poleCenterX, poleTopY, 'mario', 'flag').setScale(2);
+    const groundTopY = this.levelOffsetY + this.levelMap.heightInPixels - 32;
+    const zoneHeight = Math.max(32, groundTopY - poleTopY);
+    this.goal = this.add.zone(poleCenterX, poleTopY + zoneHeight / 2, 24, zoneHeight);
+    this.physics.add.existing(this.goal, true);
   }
 
   createEnemies() {

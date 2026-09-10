@@ -43,6 +43,10 @@
 - 建立 Node.js、建置產物、測試報告與本機設定的 `.gitignore`。
 - 建立 Vite 啟動骨架、Vitest 單元測試與 Playwright smoke test。
 
+### Fixed
+
+- 修正碰到旗杆無法過關：過關觸發區改為覆蓋整根旗杆，旗幟小圖僅做視覺裝飾。
+
 ### Documentation
 
 - 記錄參考專案素材、私人使用限制與 AI 輔助開發流程。
