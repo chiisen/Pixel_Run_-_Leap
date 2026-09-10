@@ -3,6 +3,8 @@
 私人本機使用的 HTML5 2D 平台遊戲，使用 Phaser 3 與 JavaScript 製作，參考
 [`ffx0s/mario-html5`](https://github.com/ffx0s/mario-html5) 的遊戲內容與素材。
 
+![demo](./images/demo.png)
+
 ## 專案狀態
 
 目前已完成標題畫面、參考地圖載入、玩家基本操作、平台碰撞、金幣、Goomba 與龜型敵人、蘑菇、火焰花、火球、星星、1UP、磚塊、水管傳送、倒數、旗杆通關、Game Over、暫停、手機觸控與參考音樂音效切片；GitHub Issues 全數關閉，完整功能見 [設計規格](docs/superpowers/specs/2026-09-10-pixel-run-leap-design.md)。
