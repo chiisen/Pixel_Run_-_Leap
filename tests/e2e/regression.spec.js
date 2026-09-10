@@ -5,6 +5,8 @@ import { expect, test } from '@playwright/test';
 
 test('碰到旗杆杆身可過關', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
@@ -20,6 +22,8 @@ test('碰到旗杆杆身可過關', async ({ page }) => {
 
 test('頂無標記問號磚會冒出金幣', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
@@ -38,21 +42,30 @@ test('頂無標記問號磚會冒出金幣', async ({ page }) => {
 
 test('頂蘑菇磚追到蘑菇會變大', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
 
-  // 站在 (109,9) ? 磚頂跳躍，頂上方 (109,5) 蘑菇磚，再往右追滑出的蘑菇。
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.evaluate(() => window.__pixelRunLeap.setPlayerPosition(1752, 338));
-    await page.waitForTimeout(150);
-    await page.keyboard.down('Space');
-    await page.waitForTimeout(200);
-    await page.keyboard.up('Space');
-    await page.waitForTimeout(600);
-    await page.keyboard.down('ArrowRight');
-    await page.waitForTimeout(1500);
-    await page.keyboard.up('ArrowRight');
+  // 站在 (109,9) ? 磚頂跳躍，頂上方 (109,5) 蘑菇磚。
+  await page.evaluate(() => window.__pixelRunLeap.setPlayerPosition(1752, 338));
+  await page.waitForTimeout(150);
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(200);
+  await page.keyboard.up('Space');
+  await page.waitForFunction(() => window.__pixelRunLeap.getItems().spawned.length > 0, null, {
+    timeout: 6000,
+  });
+
+  // 傳送到冒出的蘑菇身上直接吃掉；往右盲追會撞怪，測的是頂磚生成收集鏈。
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const mushroom = await page.evaluate(() => window.__pixelRunLeap.getItems().spawned[0]);
+    if (!mushroom) {
+      break;
+    }
+    await page.evaluate(({ x, y }) => window.__pixelRunLeap.setPlayerPosition(x, y), mushroom);
+    await page.waitForTimeout(300);
     const power = await page.evaluate(() => window.__pixelRunLeap.getState().power);
     if (power === 'super') {
       break;
@@ -65,6 +78,8 @@ test('頂蘑菇磚追到蘑菇會變大', async ({ page }) => {
 
 test('頂星星磚追到星星會無敵', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
@@ -95,6 +110,8 @@ test('頂星星磚追到星星會無敵', async ({ page }) => {
 
 test('高台敵人到邊緣回頭不掉落', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
@@ -108,6 +125,8 @@ test('高台敵人到邊緣回頭不掉落', async ({ page }) => {
 
 test('開局無靜態道具裸露', async ({ page }) => {
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.waitForTimeout(500);
@@ -122,6 +141,8 @@ test('開局無靜態道具裸露', async ({ page }) => {
 test('頂出的蘑菇15秒未吃會消失', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/?test=1');
+  // 標題場景就緒（audio 旗標與鍵盤監聽同一幀註冊）後再按空白鍵，太早按會遺失。
+  await page.waitForFunction(() => window.__pixelRunLeapAudio !== undefined);
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.locator('canvas').click();
