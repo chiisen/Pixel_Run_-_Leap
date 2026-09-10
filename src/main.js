@@ -198,7 +198,8 @@ class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.spawnedItems, this.handlePowerUp, null, this);
     this.physics.add.overlap(this.fireballs, this.enemies, this.handleFireballEnemy, null, this);
     this.physics.add.overlap(this.player, this.goal, () => this.completeLevel());
-    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.startFollow(this.player, true, 1, 1);
+    // 跟隨不加平滑：平滑會在放開方向鍵後讓鏡頭繼續滑行，看起來像主角有慣性。
     this.cameras.main.roundPixels = true;
 
     this.time.addEvent({
@@ -256,6 +257,10 @@ class GameScene extends Phaser.Scene {
         getWorldBounds: () => ({
           height: this.physics.world.bounds.height,
           width: this.physics.world.bounds.width,
+        }),
+        getCamera: () => ({
+          scrollX: this.cameras.main.scrollX,
+          scrollY: this.cameras.main.scrollY,
         }),
         setPlayerPosition: (x, y) => {
           this.player.setPosition(x, y);
