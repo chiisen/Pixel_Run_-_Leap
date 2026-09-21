@@ -9,12 +9,13 @@ export class ActionLogger {
   }
 
   log(category, action, details = {}, snapshot = null) {
+    const safeDetails = details ?? {};
     const entry = {
       id: this.nextId++,
       timestamp: Date.now(),
       category,
       action,
-      details: { ...details },
+      details: { ...safeDetails },
     };
 
     if (snapshot) {
@@ -30,8 +31,11 @@ export class ActionLogger {
     }
 
     if (this.consoleOutput && typeof this.loggerFn === 'function') {
-      const detailStr = Object.keys(details).length > 0 ? JSON.stringify(details) : '';
-      const snapStr = snapshot ? ` (x:${snapshot.x}, y:${snapshot.y})` : '';
+      const detailStr = Object.keys(safeDetails).length > 0 ? JSON.stringify(safeDetails) : '';
+      const snapStr =
+        snapshot && snapshot.x !== undefined && snapshot.y !== undefined
+          ? ` (x:${snapshot.x}, y:${snapshot.y})`
+          : '';
       this.loggerFn(
         `[PixelRun][${category.toUpperCase()}] ${action}${snapStr} ${detailStr}`.trim(),
       );

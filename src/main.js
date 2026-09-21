@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 
 import './styles.css';
 
+import { ActionLogger } from './game/actionLogger.js';
 import {
   ITEM_LIFETIME_MS,
   QUESTION_BLOCK_INDEX,
@@ -20,6 +21,27 @@ import {
   tickTimer,
   togglePause,
 } from './game/gameState.js';
+
+const globalActionLogger = new ActionLogger();
+
+const exposeGlobalDebugApi = () => {
+  window.__pixelRunLeap = {
+    ...window.__pixelRunLeap,
+    clearLogs: () => globalActionLogger.clear(),
+    exportLogs: () => globalActionLogger.exportLogs(),
+    getLogs: (filter) => globalActionLogger.getLogs(filter),
+    setLogConfig: (options = {}) => {
+      if (options.consoleOutput !== undefined) {
+        globalActionLogger.setConsoleOutput(options.consoleOutput);
+      }
+      if (options.maxSize !== undefined) {
+        globalActionLogger.maxSize = options.maxSize;
+      }
+    },
+  };
+};
+
+exposeGlobalDebugApi();
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 450;
@@ -52,6 +74,7 @@ class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    globalActionLogger.log('system', 'scene_start', { sceneName: 'TitleScene' });
     const audioState = TitleScene.getAudioState();
     this.musicEnabled = audioState.musicEnabled;
     this.sfxEnabled = audioState.sfxEnabled;
@@ -129,6 +152,10 @@ class TitleScene extends Phaser.Scene {
       this.sfxEnabled = state.sfxEnabled;
     }
     this.refreshAudioToggleLabels();
+    globalActionLogger.log('input', 'audio_toggle', {
+      enabled: kind === 'music' ? this.musicEnabled : this.sfxEnabled,
+      type: kind,
+    });
   }
 
   refreshAudioToggleLabels() {
@@ -147,9 +174,30 @@ class GameScene extends Phaser.Scene {
     super('GameScene');
     this.gameState = createGameState();
     this.resultShown = false;
+    this.wasOnGround = false;
+  }
+
+  captureSnapshot() {
+    if (!this.player || !this.player.body) {
+      return null;
+    }
+    return {
+      coins: this.gameState.coins,
+      gameTime: this.gameState.timeRemaining,
+      lives: this.gameState.lives,
+      onGround: Boolean(this.player.body.blocked.down),
+      power: this.gameState.power,
+      score: this.gameState.score,
+      status: this.gameState.status,
+      vx: Math.round(this.player.body.velocity.x),
+      vy: Math.round(this.player.body.velocity.y),
+      x: Math.round(this.player.x * 10) / 10,
+      y: Math.round(this.player.y * 10) / 10,
+    };
   }
 
   create() {
+    globalActionLogger.log('system', 'scene_start', { sceneName: 'GameScene' });
     // 目前先以單一場景驗證素材、物理與遊戲狀態可以正常串接。
     // Phaser scene.restart() 會重用場景實例，因此必須在每次 create() 重設執行狀態。
     this.gameState = createGameState();
@@ -158,6 +206,7 @@ class GameScene extends Phaser.Scene {
     this.hurtCooldownUntil = 0;
     this.hurtBlinkEvent = null;
     this.physics.world.isPaused = false;
+    this.wasOnGround = false;
     const audioState = (window.__pixelRunLeapAudio ??= {
       musicEnabled: true,
       sfxEnabled: true,
@@ -215,8 +264,10 @@ class GameScene extends Phaser.Scene {
 
     // 供 Playwright 與 AI 測試確認資產載入及場景初始化已完成。
     window.__pixelRunLeapReady = true;
+    exposeGlobalDebugApi();
     if (this.debugMode || this.testMode) {
       window.__pixelRunLeap = {
+        ...window.__pixelRunLeap,
         getEnemies: () =>
           this.enemies.getChildren().map((enemy) => ({
             active: enemy.active,
@@ -293,7 +344,12 @@ class GameScene extends Phaser.Scene {
     }
 
     const downHeld = down.isDown || this.touchState.down;
-    const onGround = this.player.body.blocked.down;
+    const onGround = Boolean(this.player.body.blocked.down);
+
+    if (!this.wasOnGround && onGround) {
+      globalActionLogger.log('player', 'land_ground', {}, this.captureSnapshot());
+    }
+    this.wasOnGround = onGround;
 
     // 蹲下只在地面成立；走下平台騰空時自動站起，避免空中卡著蹲姿。
     if (this.isCrouching && !onGround) {
@@ -305,7 +361,8 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.player.y > this.levelOffsetY + this.levelMap.heightInPixels + 64) {
-      this.handlePlayerDeath();
+      globalActionLogger.log('player', 'fall_pit', {}, this.captureSnapshot());
+      this.handlePlayerDeath('pit');
       return;
     }
 
@@ -345,6 +402,8 @@ class GameScene extends Phaser.Scene {
     if (jumpPressed && this.player.body.blocked.down) {
       this.player.setVelocityY(-300);
       this.playSfx('smb_jump-small');
+      globalActionLogger.log('player', 'jump_start', {}, this.captureSnapshot());
+      this.wasOnGround = false;
     }
 
     if (Phaser.Input.Keyboard.JustDown(fire) || this.touchFireQueued) {
@@ -504,6 +563,13 @@ class GameScene extends Phaser.Scene {
     if (on) {
       this.player.setVelocityX(0);
     }
+
+    globalActionLogger.log(
+      'player',
+      on ? 'crouch_start' : 'crouch_end',
+      {},
+      this.captureSnapshot(),
+    );
   }
 
   updatePlayerAnimation() {
@@ -691,6 +757,16 @@ class GameScene extends Phaser.Scene {
     this.gameState = collectCoin(this.gameState);
     coin.destroy();
     this.playSfx('smb_coin');
+    globalActionLogger.log(
+      'item',
+      'collect_coin',
+      {
+        amount: 1,
+        newTotal: this.gameState.coins,
+        source: 'map',
+      },
+      this.captureSnapshot(),
+    );
     this.updateHud();
   }
 
@@ -867,6 +943,35 @@ class GameScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-T', this.returnToTitle, this);
     this.input.keyboard.on('keydown-P', this.togglePause, this);
 
+    const controlledKeys = new Set([
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowDown',
+      'Space',
+      'KeyZ',
+      'KeyP',
+      'KeyR',
+      'KeyT',
+      'KeyA',
+      'KeyD',
+    ]);
+    this.handleKeyDown = (event) => {
+      const code = event.code;
+      if (event.repeat || !controlledKeys.has(code)) {
+        return;
+      }
+      globalActionLogger.log('input', 'key_down', { key: code }, this.captureSnapshot());
+    };
+    this.handleKeyUp = (event) => {
+      const code = event.code;
+      if (!controlledKeys.has(code)) {
+        return;
+      }
+      globalActionLogger.log('input', 'key_up', { key: code }, this.captureSnapshot());
+    };
+    this.input.keyboard.on('keydown', this.handleKeyDown);
+    this.input.keyboard.on('keyup', this.handleKeyUp);
+
     this.touchState = { down: false, left: false, right: false };
     this.touchJumpQueued = false;
     this.touchFireQueued = false;
@@ -874,24 +979,74 @@ class GameScene extends Phaser.Scene {
     this.bindTouchButton('touch-left', 'left');
     this.bindTouchButton('touch-right', 'right');
     this.bindTouchButton('touch-down', 'down');
-    document.querySelector('#touch-fire').addEventListener(
+
+    const fireButton = document.querySelector('#touch-fire');
+    let fireActive = false;
+    fireButton.addEventListener(
       'pointerdown',
       (event) => {
         event.preventDefault();
         this.startAudio();
         this.touchFireQueued = true;
+        fireActive = true;
+        globalActionLogger.log(
+          'input',
+          'touch_start',
+          { button: '#touch-fire' },
+          this.captureSnapshot(),
+        );
       },
       { signal: this.domAbortController.signal },
     );
-    document.querySelector('#touch-jump').addEventListener(
+    const endFire = () => {
+      if (fireActive) {
+        fireActive = false;
+        globalActionLogger.log(
+          'input',
+          'touch_end',
+          { button: '#touch-fire' },
+          this.captureSnapshot(),
+        );
+      }
+    };
+    fireButton.addEventListener('pointerup', endFire, { signal: this.domAbortController.signal });
+    fireButton.addEventListener('pointercancel', endFire, {
+      signal: this.domAbortController.signal,
+    });
+
+    const jumpButton = document.querySelector('#touch-jump');
+    let jumpActive = false;
+    jumpButton.addEventListener(
       'pointerdown',
       (event) => {
         event.preventDefault();
         this.startAudio();
         this.touchJumpQueued = true;
+        jumpActive = true;
+        globalActionLogger.log(
+          'input',
+          'touch_start',
+          { button: '#touch-jump' },
+          this.captureSnapshot(),
+        );
       },
       { signal: this.domAbortController.signal },
     );
+    const endJump = () => {
+      if (jumpActive) {
+        jumpActive = false;
+        globalActionLogger.log(
+          'input',
+          'touch_end',
+          { button: '#touch-jump' },
+          this.captureSnapshot(),
+        );
+      }
+    };
+    jumpButton.addEventListener('pointerup', endJump, { signal: this.domAbortController.signal });
+    jumpButton.addEventListener('pointercancel', endJump, {
+      signal: this.domAbortController.signal,
+    });
   }
 
   handleEnemyContact(player, enemy) {
@@ -903,21 +1058,57 @@ class GameScene extends Phaser.Scene {
 
     if (stomping || this.gameState.invincible) {
       // 踩踏會反彈玩家、停用敵人碰撞，再延遲移除其 Sprite。
+      const enemyType = enemy.getData('type');
+      const scoreBefore = this.gameState.score;
       this.gameState = defeatEnemy(this.gameState);
+      const scoreGained = this.gameState.score - scoreBefore;
       enemy.setFrame(enemy.getData('type') === 'turtle' ? 'turtle/shell' : 'goomba/flat');
       enemy.setVelocity(0, 0);
       enemy.body.enable = false;
       player.setVelocityY(-220);
       this.playSfx('smb_stomp');
+      globalActionLogger.log(
+        'combat',
+        'stomp_enemy',
+        {
+          enemyType,
+          scoreGained,
+          x: Math.round(enemy.x * 10) / 10,
+          y: Math.round(enemy.y * 10) / 10,
+        },
+        this.captureSnapshot(),
+      );
       this.time.delayedCall(300, () => enemy.destroy());
     } else if (this.time.now < this.hurtCooldownUntil) {
       // 受傷無敵閃爍中，直接穿過敵人。
       return;
     } else if (this.gameState.power === 'super' || this.gameState.power === 'fire') {
+      const enemyType = enemy.getData('type');
       this.shrinkPlayerFromHit();
+      globalActionLogger.log(
+        'combat',
+        'hit_by_enemy',
+        {
+          enemyType,
+          newPower: this.gameState.power,
+          result: 'lose_power',
+        },
+        this.captureSnapshot(),
+      );
     } else {
+      const enemyType = enemy.getData('type');
+      globalActionLogger.log(
+        'combat',
+        'hit_by_enemy',
+        {
+          enemyType,
+          newPower: this.gameState.power,
+          result: 'die',
+        },
+        this.captureSnapshot(),
+      );
       // 非踩踏碰撞使用與掉出地圖相同的死亡流程。
-      this.handlePlayerDeath();
+      this.handlePlayerDeath('damage');
     }
 
     this.updateHud();
@@ -972,6 +1163,17 @@ class GameScene extends Phaser.Scene {
 
       this.worldLayer.removeTileAt(tile.x, tile.y);
       this.playSfx('smb_breakblock');
+      globalActionLogger.log(
+        'item',
+        'bump_block',
+        {
+          spawn: 'none',
+          tileX: tile.x,
+          tileY: tile.y,
+          type: 'breakable',
+        },
+        this.captureSnapshot(),
+      );
       return;
     }
 
@@ -983,6 +1185,17 @@ class GameScene extends Phaser.Scene {
     this.playSfx('smb_bump');
 
     const type = resolveSpawnType(this.spawnTable, tile.x, tile.y);
+    globalActionLogger.log(
+      'item',
+      'bump_block',
+      {
+        spawn: type,
+        tileX: tile.x,
+        tileY: tile.y,
+        type: 'question',
+      },
+      this.captureSnapshot(),
+    );
 
     if (type === 'coin') {
       this.spawnCoinPop(tile);
@@ -998,6 +1211,16 @@ class GameScene extends Phaser.Scene {
 
     this.gameState = collectCoin(this.gameState);
     this.playSfx('smb_coin');
+    globalActionLogger.log(
+      'item',
+      'collect_coin',
+      {
+        amount: 1,
+        newTotal: this.gameState.coins,
+        source: 'block',
+      },
+      this.captureSnapshot(),
+    );
     this.updateHud();
 
     const coin = this.add.image(x, y - 8, 'mario', 'coin/coin1').setScale(2);
@@ -1080,9 +1303,19 @@ class GameScene extends Phaser.Scene {
     this.player.setPosition(destination.x + 8, destination.y - 16);
     this.pipeCooldown = 30;
     this.playSfx('smb_pipe');
+    globalActionLogger.log(
+      'player',
+      'enter_pipe',
+      {
+        pipe: pipe.name,
+        targetX: destination.x + 8,
+        targetY: destination.y - 16,
+      },
+      this.captureSnapshot(),
+    );
   }
 
-  handlePlayerDeath() {
+  handlePlayerDeath(reason = 'damage') {
     if (this.gameState.status !== 'playing') {
       return;
     }
@@ -1096,6 +1329,15 @@ class GameScene extends Phaser.Scene {
     if (this.gameState.status === 'game-over') {
       this.player.setFrame('mario/dead');
       this.player.setVelocity(0, 0);
+      globalActionLogger.log(
+        'system',
+        'game_over',
+        {
+          finalScore: this.gameState.score,
+          reason,
+        },
+        this.captureSnapshot(),
+      );
     } else {
       this.player.setPosition(this.spawnPosition.x, this.spawnPosition.y);
       this.player.setVelocity(0, -180);
@@ -1115,6 +1357,15 @@ class GameScene extends Phaser.Scene {
     this.gameState = collectPowerUp(this.gameState, type);
     powerUp.destroy();
     this.playSfx(type === '1up' ? 'smb_1-up' : 'smb_powerup');
+    globalActionLogger.log(
+      'item',
+      'collect_powerup',
+      {
+        itemType: type,
+        newPower: this.gameState.power,
+      },
+      this.captureSnapshot(),
+    );
 
     if (type === 'mushroom') {
       player.setFrame('mario/standSuper');
@@ -1165,6 +1416,15 @@ class GameScene extends Phaser.Scene {
     fireball.setCollideWorldBounds(true);
     this.fireCooldown = 20;
     this.playSfx('smb_fireball');
+    globalActionLogger.log(
+      'item',
+      'fireball_shoot',
+      {
+        currentFireballsCount: this.fireballs.countActive(true),
+        direction,
+      },
+      this.captureSnapshot(),
+    );
     this.time.delayedCall(2500, () => fireball.destroy());
   }
 
@@ -1173,11 +1433,23 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
+    const enemyType = enemy.getData('type');
+    const scoreBefore = this.gameState.score;
     this.gameState = defeatEnemy(this.gameState);
+    const scoreGained = this.gameState.score - scoreBefore;
     enemy.setFrame(enemy.getData('type') === 'turtle' ? 'turtle/shell' : 'goomba/flat');
     enemy.body.enable = false;
     fireball.destroy();
     this.playSfx('smb_kick');
+    globalActionLogger.log(
+      'combat',
+      'fireball_hit_enemy',
+      {
+        enemyType,
+        scoreGained,
+      },
+      this.captureSnapshot(),
+    );
     this.updateHud();
     this.time.delayedCall(300, () => enemy.destroy());
   }
@@ -1206,8 +1478,16 @@ class GameScene extends Phaser.Scene {
   bindTouchButton(id, direction) {
     const button = document.querySelector(`#${id}`);
     const setPressed = (pressed) => {
-      this.touchState[direction] = pressed;
-      button.dataset.active = String(pressed);
+      if (this.touchState[direction] !== pressed) {
+        this.touchState[direction] = pressed;
+        button.dataset.active = String(pressed);
+        globalActionLogger.log(
+          'input',
+          pressed ? 'touch_start' : 'touch_end',
+          { button: `#${id}` },
+          this.captureSnapshot(),
+        );
+      }
     };
 
     button.addEventListener(
@@ -1216,7 +1496,11 @@ class GameScene extends Phaser.Scene {
         event.preventDefault();
         this.startAudio();
         setPressed(true);
-        button.setPointerCapture(event.pointerId);
+        try {
+          button.setPointerCapture(event.pointerId);
+        } catch {
+          // 忽略合成指針或無效 pointerId 的異常
+        }
       },
       { signal: this.domAbortController.signal },
     );
@@ -1234,6 +1518,12 @@ class GameScene extends Phaser.Scene {
 
   cleanupScene() {
     this.domAbortController.abort();
+    if (this.handleKeyDown) {
+      this.input.keyboard.off('keydown', this.handleKeyDown);
+    }
+    if (this.handleKeyUp) {
+      this.input.keyboard.off('keyup', this.handleKeyUp);
+    }
     this.input.keyboard.off('keydown-R', this.restartGame, this);
     this.input.keyboard.off('keydown-T', this.returnToTitle, this);
     this.input.keyboard.off('keydown-P', this.togglePause, this);
@@ -1242,12 +1532,14 @@ class GameScene extends Phaser.Scene {
 
   restartGame() {
     if (this.gameState.status !== 'playing') {
+      globalActionLogger.log('system', 'game_restart', { action: 'restart' });
       this.scene.restart();
     }
   }
 
   returnToTitle() {
     if (this.gameState.status !== 'playing') {
+      globalActionLogger.log('system', 'game_restart', { action: 'return_to_title' });
       this.scene.start('TitleScene');
     }
   }
@@ -1259,6 +1551,17 @@ class GameScene extends Phaser.Scene {
 
     this.gameState = tickTimer(this.gameState);
     this.updateHud();
+    if (this.gameState.status === 'game-over') {
+      globalActionLogger.log(
+        'system',
+        'game_over',
+        {
+          finalScore: this.gameState.score,
+          reason: 'time_out',
+        },
+        this.captureSnapshot(),
+      );
+    }
     this.showResultIfFinished();
   }
 
@@ -1272,6 +1575,13 @@ class GameScene extends Phaser.Scene {
     } else {
       this.sound.resumeAll();
     }
+
+    globalActionLogger.log(
+      'system',
+      'pause_toggle',
+      { paused: this.gameState.paused },
+      this.captureSnapshot(),
+    );
   }
 
   completeLevel() {
@@ -1279,9 +1589,20 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.gameState = completeLevel(this.gameState, this.gameState.timeRemaining * 10);
+    const timeBonus = this.gameState.timeRemaining * 10;
+    this.gameState = completeLevel(this.gameState, timeBonus);
     this.updateHud();
     this.playSfx('smb_flagpole');
+    globalActionLogger.log(
+      'system',
+      'level_complete',
+      {
+        finalScore: this.gameState.score,
+        timeBonus,
+        timeRemaining: this.gameState.timeRemaining,
+      },
+      this.captureSnapshot(),
+    );
     this.showResultIfFinished();
   }
 
