@@ -4,7 +4,8 @@
 
 **Goal:** 為遊戲建立一套輕量且完整的操作歷程記錄系統（Action & Event Logger），支援 Console 即時輸出與記憶體環形緩衝區查詢，協助 AI Agent 與開發者排查問題。
 
-**Architecture:** 
+**Architecture:**
+
 1. 建立純 JavaScript 的 `ActionLogger` 模組，管理容量 200 筆的環形緩衝區、快照產生、過濾查詢與格式化輸出。
 2. 在 `src/main.js` 整合 `ActionLogger`，掛載全域 `window.__pixelRunLeap.getLogs` 等介面，並在輸入、玩家動作轉移、戰鬥碰撞、道具收集與系統狀態轉移點記錄事件。
 3. 撰寫 Vitest 單元測試與 Playwright 端對端測試全面驗證。
@@ -24,10 +25,12 @@
 ### Task 1: 建立核心 `ActionLogger` 模組與單元測試
 
 **Files:**
+
 - Create: `src/game/actionLogger.js`
 - Test: `tests/unit/actionLogger.test.js`
 
 **Interfaces:**
+
 - Produces:
   - `class ActionLogger`:
     - `constructor(options?: { maxSize?: number, consoleOutput?: boolean, loggerFn?: Function })`
@@ -154,7 +157,9 @@ export class ActionLogger {
     if (this.consoleOutput && typeof this.loggerFn === 'function') {
       const detailStr = Object.keys(details).length > 0 ? JSON.stringify(details) : '';
       const snapStr = snapshot ? ` (x:${snapshot.x}, y:${snapshot.y})` : '';
-      this.loggerFn(`[PixelRun][${category.toUpperCase()}] ${action}${snapStr} ${detailStr}`.trim());
+      this.loggerFn(
+        `[PixelRun][${category.toUpperCase()}] ${action}${snapStr} ${detailStr}`.trim(),
+      );
     }
 
     return entry;
@@ -211,9 +216,11 @@ git commit -m "feat(日誌): 建立核心 ActionLogger 模組與單元測試"
 ### Task 2: 在遊戲場景 (`src/main.js`) 整合 ActionLogger 與全域介面
 
 **Files:**
+
 - Modify: `src/main.js`
 
 **Interfaces:**
+
 - Consumes: `ActionLogger` from `./game/actionLogger.js`
 - Produces:
   - `window.__pixelRunLeap.getLogs(filter)`
@@ -225,6 +232,7 @@ git commit -m "feat(日誌): 建立核心 ActionLogger 模組與單元測試"
 
 在 `src/main.js` 引入 `ActionLogger`，初始化 `const globalActionLogger = new ActionLogger();`。
 在 `window.__pixelRunLeap` 暴露日誌 API：
+
 ```javascript
 window.__pixelRunLeap = {
   ...window.__pixelRunLeap,
@@ -245,6 +253,7 @@ window.__pixelRunLeap = {
 - [ ] **Step 2: 建立快照擷取小工具函式 `captureSnapshot`**
 
 在 `GameScene` 內提供 `captureSnapshot()` 方法：
+
 ```javascript
 captureSnapshot() {
   if (!this.player || !this.player.body) return null;
@@ -309,6 +318,7 @@ git commit -m "feat(日誌): 在遊戲場景與玩家操作整合歷程記錄"
 ### Task 3: 撰寫 Playwright 端對端測試並驗證完整流程
 
 **Files:**
+
 - Create: `tests/e2e/actionLogger.spec.js`
 - Modify: `CHANGELOG.md`
 
