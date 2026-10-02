@@ -4,6 +4,7 @@ import { resolveEnemyHit } from '../../src/game/combat.js';
 import { createGameState, togglePause } from '../../src/game/gameState.js';
 import { resolveHorizontalMove } from '../../src/game/input.js';
 import { assignPowerUpMarkers } from '../../src/game/levelSpawns.js';
+import { buildEnemySpawn } from '../../src/entities/enemySpawn.js';
 import { applyPatrolLeash } from '../../src/game/patrol.js';
 
 describe('暫停', () => {
@@ -74,6 +75,16 @@ describe('關卡標記', () => {
     );
 
     expect(assigned.entries[0]).toMatchObject({ name: '1up', tileX: 23, tileY: 9 });
+  });
+});
+
+describe('敵人出生資料', () => {
+  it('烏龜出生點比 goomba 再上移，速度較慢', () => {
+    expect(buildEnemySpawn({ levelOffsetY: 10, name: 'turtle', x: 100, y: 200 })).toMatchObject({
+      speed: -25,
+      y: 186,
+    });
+    expect(buildEnemySpawn({ levelOffsetY: 10, name: 'goomba', x: 100, y: 200 }).y).toBe(194);
   });
 });
 

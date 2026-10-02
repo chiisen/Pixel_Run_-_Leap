@@ -4,10 +4,13 @@
 
 格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.0.0/)，版本遵循語意化版本原則。
 
-## [未發布]
+## [0.1.0] - 2026-10-03
 
 ### Fixed
 
+- 正式建置不再暴露 `?test=1` 的傳送與狀態查詢介面。
+- Playwright 加入 Firefox 與 WebKit。真實手機仍未覆蓋。
+- 場景拆到 `src/scenes/`，敵人出生資料放到 `src/entities/`，測試介面放到 `src/systems/`。
 - 敵人加上出生點巡邏範圍，走出範圍就回頭，不再整群擠到同一面牆角。
 - 地圖 `modifiers` 補上花朵標記，改由問號磚頂出，移除開局靜態花朵。
 - 補上暫停、輸入轉換、敵人碰撞與關卡標記的單元測試，並把規則抽成純函式。
