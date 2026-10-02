@@ -22,7 +22,7 @@ import {
 } from '../game/gameState.js';
 import { resolveHorizontalMove } from '../game/input.js';
 import { assignPowerUpMarkers } from '../game/levelSpawns.js';
-import { applyPatrolLeash } from '../game/patrol.js';
+import { applyPatrolLeash, clampPatrolSpeed } from '../game/patrol.js';
 import {
   ITEM_LIFETIME_MS,
   QUESTION_BLOCK_INDEX,
@@ -576,6 +576,7 @@ export class GameScene extends Phaser.Scene {
       enemy.setScale(2);
       enemy.setData('type', name);
       enemy.setData('homeX', x);
+      enemy.setData('patrolSpeed', Math.abs(speed));
       enemy.play(name === 'turtle' ? 'turtle-walk' : 'goomba-walk');
       enemy.setVelocityX(speed);
       enemy.setBounceX(1);
@@ -599,7 +600,7 @@ export class GameScene extends Phaser.Scene {
 
       const velocityX = applyPatrolLeash({
         homeX: enemy.getData('homeX'),
-        velocityX: enemy.body.velocity.x,
+        velocityX: clampPatrolSpeed(enemy.body.velocity.x, enemy.getData('patrolSpeed')),
         x: enemy.x,
       });
 
@@ -902,7 +903,8 @@ export class GameScene extends Phaser.Scene {
         },
         this.captureSnapshot(),
       );
-      // 非踩踏碰撞使用與掉出地圖相同的死亡流程。
+      // 分離可能把玩家水平速度疊進敵人，先拉回出生速率，更新迴圈每幀再夾一次。
+      enemy.setVelocityX(clampPatrolSpeed(enemy.body.velocity.x, enemy.getData('patrolSpeed')));
       this.handlePlayerDeath('damage');
     }
 

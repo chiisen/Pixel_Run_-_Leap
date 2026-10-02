@@ -11,7 +11,7 @@ import {
   turtleFlipX,
 } from '../../src/game/actorMotion.js';
 import { buildEnemySpawn } from '../../src/entities/enemySpawn.js';
-import { applyPatrolLeash } from '../../src/game/patrol.js';
+import { applyPatrolLeash, clampPatrolSpeed } from '../../src/game/patrol.js';
 
 describe('暫停', () => {
   it('切換暫停且不改生命與分數', () => {
@@ -114,6 +114,22 @@ describe('掉洞與烏龜朝向', () => {
   it('烏龜往左走時翻面，往右走維持貼圖原方向', () => {
     expect(turtleFlipX(-25)).toBe(true);
     expect(turtleFlipX(25)).toBe(false);
+  });
+});
+
+describe('撞敵後的巡邏速度', () => {
+  it('被撞大的 Goomba 與烏龜會回到出生速率，方向保留', () => {
+    expect(clampPatrolSpeed(180, 35)).toBe(35);
+    expect(clampPatrolSpeed(-220, 35)).toBe(-35);
+    expect(clampPatrolSpeed(90, 25)).toBe(25);
+    expect(clampPatrolSpeed(-80, 25)).toBe(-25);
+  });
+
+  it('同一隻再被撞大一次仍然只回到出生速率', () => {
+    const once = clampPatrolSpeed(180, 35);
+    expect(clampPatrolSpeed(once + 140, 35)).toBe(35);
+    const turtle = clampPatrolSpeed(-90, 25);
+    expect(clampPatrolSpeed(turtle - 70, 25)).toBe(-25);
   });
 });
 
