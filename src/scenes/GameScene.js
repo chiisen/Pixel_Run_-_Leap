@@ -137,6 +137,8 @@ export class GameScene extends Phaser.Scene {
     const { a, d, down, fire, left, right, jump } = this.inputState;
 
     if (this.dying) {
+      // 死亡期間不跑 updateEnemies，分離若在回呼之後加速，要在這裡先夾回。
+      this.clampEnemyPatrolSpeeds();
       this.player.setFlipY(deathUpsideDown(this.player.body.velocity.y));
       if (
         deathFallFinished({
@@ -587,6 +589,16 @@ export class GameScene extends Phaser.Scene {
       } else {
         enemy.body.setSize(14, 14).setOffset(1, 2);
       }
+    });
+  }
+
+  clampEnemyPatrolSpeeds() {
+    this.enemies?.getChildren().forEach((enemy) => {
+      if (!enemy.active || !enemy.body) {
+        return;
+      }
+
+      enemy.setVelocityX(clampPatrolSpeed(enemy.body.velocity.x, enemy.getData('patrolSpeed')));
     });
   }
 
@@ -1144,6 +1156,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setFlipY(false);
     this.player.body.checkCollision.none = false;
     this.player.setCollideWorldBounds(true);
+    this.clampEnemyPatrolSpeeds();
     this.enemies.getChildren().forEach((enemy) => {
       if (enemy.active && enemy.body) {
         enemy.body.moves = true;
