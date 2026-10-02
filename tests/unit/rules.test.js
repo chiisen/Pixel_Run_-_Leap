@@ -4,6 +4,7 @@ import { resolveEnemyHit } from '../../src/game/combat.js';
 import { createGameState, togglePause } from '../../src/game/gameState.js';
 import { resolveHorizontalMove } from '../../src/game/input.js';
 import { assignPowerUpMarkers } from '../../src/game/levelSpawns.js';
+import { hasFallenPastFloor, turtleFlipX } from '../../src/game/actorMotion.js';
 import { buildEnemySpawn } from '../../src/entities/enemySpawn.js';
 import { applyPatrolLeash } from '../../src/game/patrol.js';
 
@@ -85,6 +86,18 @@ describe('敵人出生資料', () => {
       y: 186,
     });
     expect(buildEnemySpawn({ levelOffsetY: 10, name: 'goomba', x: 100, y: 200 }).y).toBe(194);
+  });
+});
+
+describe('掉洞與烏龜朝向', () => {
+  it('腳底超過關卡底邊才算掉洞', () => {
+    expect(hasFallenPastFloor(450, 450)).toBe(false);
+    expect(hasFallenPastFloor(451, 450)).toBe(true);
+  });
+
+  it('烏龜往右走時翻面，往左走維持貼圖原方向', () => {
+    expect(turtleFlipX(-25)).toBe(false);
+    expect(turtleFlipX(25)).toBe(true);
   });
 });
 

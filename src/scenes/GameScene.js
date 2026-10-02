@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 
+import { hasFallenPastFloor, turtleFlipX } from '../game/actorMotion.js';
 import { resolveEnemyHit } from '../game/combat.js';
 import { GAME_HEIGHT, GAME_WIDTH, HURT_COOLDOWN_MS } from '../game/constants.js';
 import {
@@ -165,7 +166,8 @@ export class GameScene extends Phaser.Scene {
       this.setCrouching(false);
     }
 
-    if (this.player.y > this.levelOffsetY + this.levelMap.heightInPixels + 64) {
+    const floorBottom = this.levelOffsetY + this.levelMap.heightInPixels;
+    if (hasFallenPastFloor(this.player.body.bottom, floorBottom)) {
       globalActionLogger.log('player', 'fall_pit', {}, this.captureSnapshot());
       this.handlePlayerDeath('pit');
       return;
@@ -239,7 +241,8 @@ export class GameScene extends Phaser.Scene {
     this.levelOffsetY = Math.max(0, GAME_HEIGHT - this.levelMap.heightInPixels);
     this.worldLayer.y = this.levelOffsetY;
     this.spawnPosition = { x: 96, y: 100 + this.levelOffsetY };
-    this.physics.world.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
+    // 底部留出落洞空間。畫面邊界仍停在視窗底，玩家才能掉過地板並觸發死亡。
+    this.physics.world.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT + 320);
     this.cameras.main.setBounds(0, 0, this.levelMap.widthInPixels, GAME_HEIGHT);
   }
 
@@ -586,6 +589,11 @@ export class GameScene extends Phaser.Scene {
     });
     this.applyLedgeTurn(this.enemies);
     this.applyLedgeTurn(this.spawnedItems);
+    this.enemies.getChildren().forEach((enemy) => {
+      if (enemy.active && enemy.getData('type') === 'turtle') {
+        enemy.setFlipX(turtleFlipX(enemy.body.velocity.x));
+      }
+    });
   }
 
   applyLedgeTurn(group) {
