@@ -131,10 +131,10 @@ test('開局無靜態道具裸露', async ({ page }) => {
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
   await page.waitForTimeout(500);
 
-  // 有磚標記走頂出生成；無磚標記（1UP）藏進空閒問號磚；
-  // 有標記種類不再靜態擺放，只剩無標記的花朵一朵靜態。
+  // 有磚標記走頂出生成；無相鄰磚的標記藏進空閒問號磚。
+  // 花朵標記在 (352, 96)，對應問號磚 (22, 5)，開局不再靜態擺放。
   const items = await page.evaluate(() => window.__pixelRunLeap.getItems());
-  expect(items.powerUps).toEqual([{ type: 'flower', x: 620, y: 360 }]);
+  expect(items.powerUps).toEqual([]);
   expect(items.spawned).toEqual([]);
 });
 

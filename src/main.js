@@ -3,6 +3,10 @@ import Phaser from 'phaser';
 import './styles.css';
 
 import { ActionLogger } from './game/actionLogger.js';
+import { resolveEnemyHit } from './game/combat.js';
+import { resolveHorizontalMove } from './game/input.js';
+import { assignPowerUpMarkers } from './game/levelSpawns.js';
+import { applyPatrolLeash } from './game/patrol.js';
 import {
   ITEM_LIFETIME_MS,
   QUESTION_BLOCK_INDEX,
@@ -277,6 +281,7 @@ class GameScene extends Phaser.Scene {
               touching: { ...enemy.body.touching },
               velocityY: enemy.body.velocity.y,
             },
+            homeX: enemy.getData('homeX'),
             x: enemy.x,
             y: enemy.y,
             type: enemy.getData('type'),
@@ -376,16 +381,16 @@ class GameScene extends Phaser.Scene {
     });
     this.updateEnemies();
 
-    if (this.isCrouching) {
-      this.player.setVelocityX(0);
-    } else if (left.isDown || a.isDown || this.touchState.left) {
-      this.player.setVelocityX(-140);
+    const move = resolveHorizontalMove({
+      crouching: this.isCrouching,
+      left: left.isDown || a.isDown || this.touchState.left,
+      right: right.isDown || d.isDown || this.touchState.right,
+    });
+    this.player.setVelocityX(move.velocityX);
+    if (move.facing === 'left') {
       this.player.setFlipX(true);
-    } else if (right.isDown || d.isDown || this.touchState.right) {
-      this.player.setVelocityX(140);
+    } else if (move.facing === 'right') {
       this.player.setFlipX(false);
-    } else {
-      this.player.setVelocityX(0);
     }
 
     this.updatePlayerAnimation();
@@ -637,8 +642,7 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.powerUps.countActive(true) === 0) {
-      // 該種類已有地圖標記（走頂出生成）就不再靜態擺放，避免裸露；
-      // 目前只有花朵無標記，保留一朵靜態作為唯一來源。
+      // 地圖已標記的種類改由問號磚頂出，不再另外靜態擺放。
       const marked = new Set(entries.map(({ name }) => name));
       const fallback = [
         { type: 'flower', frame: 'powerup/flower1', x: 620, y: 150 + this.levelOffsetY },
@@ -681,72 +685,20 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  findQuestionBlock(x, y) {
-    const tileX = Math.floor(x / 16);
-    const tileY = Math.floor(y / 16);
-
-    // 標記座落在磚格邊界上，上下各找一格內的問號磚。
-    for (const candidateY of [tileY - 1, tileY, tileY + 1]) {
-      const tile = this.levelMap.getTileAt(tileX, candidateY, false, 'world');
-
-      if (tile?.index === QUESTION_BLOCK_INDEX) {
-        return { tileX, tileY: candidateY };
-      }
-    }
-
-    return null;
-  }
-
   findBlockSpawns(modifiers) {
-    const markers = modifiers.filter(
-      ({ name, type }) =>
-        type === 'powerUp' && ['coin', 'flower', 'mushroom', 'star', '1up'].includes(name),
-    );
-    const entries = [];
-    const usedKeys = new Set();
-    const statics = [];
+    const questionTiles = [];
 
-    markers.forEach(({ name, x, y }) => {
-      const block = this.findQuestionBlock(x, y);
-
-      if (block) {
-        entries.push({ name, ...block });
-        usedKeys.add(`${block.tileX},${block.tileY}`);
-        return;
-      }
-
-      // 無相鄰問號磚的標記（如懸空 1UP）藏進最近的空閒問號磚；
-      // 沒有空閒磚才回退靜態擺放。
-      const spare = this.findSpareQuestionBlock(x, usedKeys);
-
-      if (spare) {
-        entries.push({ name, ...spare });
-        usedKeys.add(`${spare.tileX},${spare.tileY}`);
-      } else {
-        statics.push({ name, x, y });
+    this.worldLayer.forEachTile((tile) => {
+      if (tile.index === QUESTION_BLOCK_INDEX) {
+        questionTiles.push({
+          centerX: tile.pixelX + 8,
+          tileX: tile.x,
+          tileY: tile.y,
+        });
       }
     });
 
-    return { entries, statics };
-  }
-
-  findSpareQuestionBlock(markerX, usedKeys) {
-    const spares = this.worldLayer.filterTiles(
-      (tile) => tile?.index === QUESTION_BLOCK_INDEX && !usedKeys.has(`${tile.x},${tile.y}`),
-      this,
-      0,
-      0,
-      this.levelMap.width,
-      this.levelMap.height,
-    );
-
-    if (spares.length === 0) {
-      return null;
-    }
-
-    spares.sort((a, b) => Math.abs(a.pixelX + 8 - markerX) - Math.abs(b.pixelX + 8 - markerX));
-
-    return { tileX: spares[0].x, tileY: spares[0].y };
+    return assignPowerUpMarkers(modifiers, questionTiles);
   }
 
   handleCoin(player, coin) {
@@ -806,6 +758,7 @@ class GameScene extends Phaser.Scene {
       const enemy = this.enemies.create(x, y, 'mario', frame);
       enemy.setScale(2);
       enemy.setData('type', name);
+      enemy.setData('homeX', x);
       enemy.play(name === 'turtle' ? 'turtle-walk' : 'goomba-walk');
       enemy.setVelocityX(speed);
       enemy.setBounceX(1);
@@ -822,6 +775,21 @@ class GameScene extends Phaser.Scene {
   updateEnemies() {
     // 懸崖偵測：落地行走時前方無磚就轉向，避免直直走下高台。
     // 地面層全連通不受影響，只改變高台邊緣行為；頂出道具共用同一規則。
+    this.enemies.getChildren().forEach((enemy) => {
+      if (!enemy.active) {
+        return;
+      }
+
+      const velocityX = applyPatrolLeash({
+        homeX: enemy.getData('homeX'),
+        velocityX: enemy.body.velocity.x,
+        x: enemy.x,
+      });
+
+      if (velocityX !== enemy.body.velocity.x) {
+        enemy.setVelocityX(velocityX);
+      }
+    });
     this.applyLedgeTurn(this.enemies);
     this.applyLedgeTurn(this.spawnedItems);
   }
@@ -1054,9 +1022,15 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    const stomping = player.body.touching.down && enemy.body.touching.up;
+    const hit = resolveEnemyHit({
+      enemyTouchingUp: enemy.body.touching.up,
+      hurtInvulnerable: this.time.now < this.hurtCooldownUntil,
+      invincible: this.gameState.invincible,
+      playerTouchingDown: player.body.touching.down,
+      power: this.gameState.power,
+    });
 
-    if (stomping || this.gameState.invincible) {
+    if (hit === 'defeat') {
       // 踩踏會反彈玩家、停用敵人碰撞，再延遲移除其 Sprite。
       const enemyType = enemy.getData('type');
       const scoreBefore = this.gameState.score;
@@ -1079,10 +1053,9 @@ class GameScene extends Phaser.Scene {
         this.captureSnapshot(),
       );
       this.time.delayedCall(300, () => enemy.destroy());
-    } else if (this.time.now < this.hurtCooldownUntil) {
-      // 受傷無敵閃爍中，直接穿過敵人。
+    } else if (hit === 'ignore') {
       return;
-    } else if (this.gameState.power === 'super' || this.gameState.power === 'fire') {
+    } else if (hit === 'downgrade') {
       const enemyType = enemy.getData('type');
       this.shrinkPlayerFromHit();
       globalActionLogger.log(

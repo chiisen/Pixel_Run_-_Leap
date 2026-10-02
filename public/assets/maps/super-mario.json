@@ -105,6 +105,18 @@
                  "y":160
                 }, 
                 {
+                 "gid":12,
+                 "height":16,
+                 "id":90,
+                 "name":"flower",
+                 "rotation":0,
+                 "type":"powerUp",
+                 "visible":true,
+                 "width":16,
+                 "x":352,
+                 "y":96
+                }, 
+                {
                  "height":16,
                  "id":48,
                  "name":"pipe1",
