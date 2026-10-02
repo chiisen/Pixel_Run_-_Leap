@@ -95,9 +95,9 @@ describe('掉洞與烏龜朝向', () => {
     expect(hasFallenPastFloor(451, 450)).toBe(true);
   });
 
-  it('烏龜往右走時翻面，往左走維持貼圖原方向', () => {
-    expect(turtleFlipX(-25)).toBe(false);
-    expect(turtleFlipX(25)).toBe(true);
+  it('烏龜往左走時翻面，往右走維持貼圖原方向', () => {
+    expect(turtleFlipX(-25)).toBe(true);
+    expect(turtleFlipX(25)).toBe(false);
   });
 });
 

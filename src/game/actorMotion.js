@@ -1,6 +1,6 @@
-// 貼圖預設朝左。往右走才需要水平翻轉。
+// 貼圖預設朝右。往左走才需要水平翻轉。
 export function turtleFlipX(velocityX) {
-  return velocityX > 0;
+  return velocityX < 0;
 }
 
 // 腳底低於關卡底邊代表已經掉進洞裡，不再站在地板上。
