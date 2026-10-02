@@ -4,7 +4,12 @@ import { resolveEnemyHit } from '../../src/game/combat.js';
 import { createGameState, togglePause } from '../../src/game/gameState.js';
 import { resolveHorizontalMove } from '../../src/game/input.js';
 import { assignPowerUpMarkers } from '../../src/game/levelSpawns.js';
-import { hasFallenPastFloor, turtleFlipX } from '../../src/game/actorMotion.js';
+import {
+  deathFallFinished,
+  deathUpsideDown,
+  hasFallenPastFloor,
+  turtleFlipX,
+} from '../../src/game/actorMotion.js';
 import { buildEnemySpawn } from '../../src/entities/enemySpawn.js';
 import { applyPatrolLeash } from '../../src/game/patrol.js';
 
@@ -90,6 +95,17 @@ describe('敵人出生資料', () => {
 });
 
 describe('掉洞與烏龜朝向', () => {
+  it('死亡演出要先彈起，時間到且掉出畫面才結束', () => {
+    expect(deathFallFinished({ elapsedMs: 200, playerY: 500, screenBottom: 450 })).toBe(false);
+    expect(deathFallFinished({ elapsedMs: 800, playerY: 200, screenBottom: 450 })).toBe(false);
+    expect(deathFallFinished({ elapsedMs: 800, playerY: 500, screenBottom: 450 })).toBe(true);
+  });
+
+  it('死亡衝過最高點後才頭腳顛倒', () => {
+    expect(deathUpsideDown(-120)).toBe(false);
+    expect(deathUpsideDown(0)).toBe(true);
+  });
+
   it('腳底超過關卡底邊才算掉洞', () => {
     expect(hasFallenPastFloor(450, 450)).toBe(false);
     expect(hasFallenPastFloor(451, 450)).toBe(true);

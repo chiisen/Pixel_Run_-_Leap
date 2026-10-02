@@ -1,6 +1,12 @@
 import Phaser from 'phaser';
 
-import { hasFallenPastFloor, turtleFlipX } from '../game/actorMotion.js';
+import {
+  DEATH_HOP_VELOCITY,
+  deathFallFinished,
+  deathUpsideDown,
+  hasFallenPastFloor,
+  turtleFlipX,
+} from '../game/actorMotion.js';
 import { resolveEnemyHit } from '../game/combat.js';
 import { GAME_HEIGHT, GAME_WIDTH, HURT_COOLDOWN_MS } from '../game/constants.js';
 import {
@@ -129,6 +135,20 @@ export class GameScene extends Phaser.Scene {
 
   update() {
     const { a, d, down, fire, left, right, jump } = this.inputState;
+
+    if (this.dying) {
+      this.player.setFlipY(deathUpsideDown(this.player.body.velocity.y));
+      if (
+        deathFallFinished({
+          elapsedMs: this.time.now - this.deathStartedAt,
+          playerY: this.player.y,
+          screenBottom: GAME_HEIGHT,
+        })
+      ) {
+        this.finishDeath();
+      }
+      return;
+    }
 
     if (this.gameState.status !== 'playing') {
       return;
@@ -1091,35 +1111,67 @@ export class GameScene extends Phaser.Scene {
   }
 
   handlePlayerDeath(reason = 'damage') {
-    if (this.gameState.status !== 'playing') {
+    if (this.dying || this.gameState.status !== 'playing') {
       return;
     }
 
+    this.dying = true;
+    this.deathReason = reason;
+    this.deathStartedAt = this.time.now;
     this.gameState = damagePlayer(this.gameState);
     this.hurtBlinkEvent?.remove();
     this.hurtBlinkEvent = null;
     this.player.setAlpha(1);
+    this.setCrouching(false);
+    this.player.setFlipY(false);
+    this.player.setFrame('mario/dead');
+    this.player.body.checkCollision.none = true;
+    this.player.setCollideWorldBounds(false);
+    this.player.setVelocity(0, DEATH_HOP_VELOCITY);
+    this.enemies.getChildren().forEach((enemy) => {
+      if (enemy.body) {
+        enemy.body.moves = false;
+      }
+    });
     this.playSfx('smb_mariodie');
+    this.updateHud();
+  }
+
+  finishDeath() {
+    this.dying = false;
+    this.player.setFlipY(false);
+    this.player.body.checkCollision.none = false;
+    this.player.setCollideWorldBounds(true);
+    this.enemies.getChildren().forEach((enemy) => {
+      if (enemy.active && enemy.body) {
+        enemy.body.moves = true;
+      }
+    });
 
     if (this.gameState.status === 'game-over') {
-      this.player.setFrame('mario/dead');
       this.player.setVelocity(0, 0);
       globalActionLogger.log(
         'system',
         'game_over',
         {
           finalScore: this.gameState.score,
-          reason,
+          reason: this.deathReason,
         },
         this.captureSnapshot(),
       );
-    } else {
-      this.player.setPosition(this.spawnPosition.x, this.spawnPosition.y);
-      this.player.setVelocity(0, -180);
+      this.showResultIfFinished();
+      return;
     }
 
-    this.updateHud();
-    this.showResultIfFinished();
+    this.player.setPosition(this.spawnPosition.x, this.spawnPosition.y);
+    this.player.setVelocity(0, 0);
+    this.updatePlayerBody(this.gameState.power, false);
+    const standFrame = {
+      fire: 'mario/standFire',
+      small: 'mario/stand',
+      super: 'mario/standSuper',
+    }[this.gameState.power];
+    this.player.setFrame(standFrame);
   }
 
   handlePowerUp(player, powerUp) {
@@ -1320,7 +1372,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   tickGameTimer() {
-    if (this.gameState.status !== 'playing' || this.gameState.paused) {
+    if (this.dying || this.gameState.status !== 'playing' || this.gameState.paused) {
       return;
     }
 
@@ -1382,7 +1434,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   showResultIfFinished() {
-    if (this.resultShown) {
+    if (this.dying || this.resultShown) {
       return;
     }
 

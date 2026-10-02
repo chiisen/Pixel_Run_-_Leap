@@ -150,9 +150,16 @@ test('玩家連續掉出地圖三次後進入 Game Over', async ({ page }) => {
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__pixelRunLeapReady === true);
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let lives = 2; lives >= 0; lives -= 1) {
     await page.evaluate(() => window.__pixelRunLeap.setPlayerPosition(100, 1000));
-    await page.waitForTimeout(350);
+    await page.waitForFunction(
+      (expectedLives) => {
+        const state = window.__pixelRunLeap.getState();
+        return state.lives === expectedLives && state.dying === false;
+      },
+      lives,
+      { timeout: 5000 },
+    );
   }
 
   const state = await page.evaluate(() => window.__pixelRunLeap.getState());

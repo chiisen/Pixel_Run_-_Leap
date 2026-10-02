@@ -55,13 +55,11 @@ export function attachPlaytestApi(scene) {
         x: Math.round(powerUp.x),
         y: Math.round(powerUp.y),
       })),
-      spawned: scene.spawnedItems
-        .getChildren()
-        .map((item) => ({
-          type: item.getData('type'),
-          x: Math.round(item.x),
-          y: Math.round(item.y),
-        })),
+      spawned: scene.spawnedItems.getChildren().map((item) => ({
+        type: item.getData('type'),
+        x: Math.round(item.x),
+        y: Math.round(item.y),
+      })),
     }),
     getPlayer: () => ({
       body: {
@@ -74,7 +72,7 @@ export function attachPlaytestApi(scene) {
       x: scene.player.x,
       y: scene.player.y,
     }),
-    getState: () => ({ ...scene.gameState }),
+    getState: () => ({ ...scene.gameState, dying: Boolean(scene.dying) }),
     getWorldBounds: () => ({
       height: scene.physics.world.bounds.height,
       width: scene.physics.world.bounds.width,
